@@ -8,7 +8,7 @@ from ..synthetic import generate
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate synthetic RM snippets with Qwen.")
+    parser = argparse.ArgumentParser(description="Generate synthetic policy-control snippets.")
     parser.add_argument("--config", default=None, help="Optional config path.")
     args = parser.parse_args()
     output_path = generate(config_path=args.config)

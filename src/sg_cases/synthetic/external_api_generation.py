@@ -252,9 +252,9 @@ def generate(config: dict[str, Any] | None = None, config_path: str | None = Non
                     elif stats["dropped_schema"] > 0:
                         fix_hint = "Fix schema: each item must have exactly keys {label, text} and both must be strings."
                     elif stats["dropped_too_short"] > 0:
-                        fix_hint = f"Make snippets longer: each RM turn must be at least {min_words} words."
+                        fix_hint = f"Make snippets longer: each agent turn must be at least {min_words} words."
                     elif stats["dropped_multi_speaker"] > 0:
-                        fix_hint = "Ensure each item is RM-only with no role prefixes or multi-speaker text."
+                        fix_hint = "Ensure each item is agent-only with no role prefixes or multi-speaker text."
                     else:
                         fix_hint = "Follow the prompt constraints more clearly; ensure compliant vs near-miss patterns are obvious."
                     if notes:

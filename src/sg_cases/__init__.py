@@ -1,4 +1,4 @@
-"""SG banking compliance pipeline package."""
+"""Policy Compliance Agent package."""
 
 from .demo import (
     approve_demo_examples,
@@ -7,14 +7,12 @@ from .demo import (
     retrain_demo_verifier,
     run_demo_inference,
 )
-from .evaluation import evaluate
 from .inference import run_semantic_inference
 from .synthetic import generate
 from .training import train_cross_encoder, train_sentence_transformer
 
 __all__ = [
     "approve_demo_examples",
-    "evaluate",
     "generate",
     "get_borderline_items",
     "label_borderline_items_with_ollama",

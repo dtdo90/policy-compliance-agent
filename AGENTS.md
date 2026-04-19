@@ -1,6 +1,6 @@
 # OpenCode Project Notes
 
-This project is a personal demo for agentic policy review. The core workflow is deterministic Python, and OpenCode should wrap, inspect, and explain that workflow rather than reimplementing it.
+This project is a personal demo for agentic policy compliance. The core workflow is deterministic Python, and OpenCode should wrap, inspect, and explain that workflow rather than reimplementing it.
 
 ## Useful Commands
 

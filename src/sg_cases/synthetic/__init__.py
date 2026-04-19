@@ -24,19 +24,6 @@ def generate(config: dict[str, Any] | None = None, config_path: str | None = Non
     raise ValueError(f"Unsupported synthetic backend: {backend}")
 
 
-def generate_synthetic_data(*args, **kwargs):
-    from .synthetic_data_generation import generate_synthetic_data as _generate_synthetic_data
-
-    return _generate_synthetic_data(*args, **kwargs)
-
-
-def generate_transcripts(*args, **kwargs):
-    from .synthetic_script_generation import generate_transcripts as _generate_transcripts
-
-    return _generate_transcripts(*args, **kwargs)
-
 __all__ = [
     "generate",
-    "generate_synthetic_data",
-    "generate_transcripts",
 ]

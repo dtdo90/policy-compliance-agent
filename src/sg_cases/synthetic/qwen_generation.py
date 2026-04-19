@@ -1,4 +1,4 @@
-"""Synthetic RM snippet generation with Qwen and a supervisor pass."""
+"""Synthetic policy-control snippet generation helpers."""
 
 from __future__ import annotations
 
@@ -251,7 +251,7 @@ def build_generator_user(user_prompt: str, fix_hint: str | None) -> str:
 
 
 def build_judge_system(min_words: int, max_words_soft: int) -> str:
-    return f"""You are a strict banking compliance supervisor scoring a GENERATED JSON ARRAY of RM snippets.
+    return f"""You are a strict policy compliance supervisor scoring a GENERATED JSON ARRAY of agent snippets.
 
 You will be given:
 - system_instruction (scenario instruction)
@@ -262,7 +262,7 @@ Evaluate:
 1) Output is a valid JSON array ONLY (no extra text).
 2) Schema: each element is an object with exactly keys ["label","text"].
    - label is exactly "Compliant" or "Non-Compliant"
-   - text is a single RM turn (no multi-speaker / no "Client:" etc.)
+   - text is a single agent turn (no multi-speaker / no "Client:" etc.)
 3) Length: "around 20 words": hard minimum {min_words} words per snippet.
    - Too-short snippets are a major issue.
    - Too-long snippets (> {max_words_soft} words) are minor but should be reduced.
@@ -476,9 +476,9 @@ def generate(config: dict[str, Any] | None = None, config_path: str | None = Non
                     elif stats["dropped_schema"] > 0:
                         fix_hint = "Fix schema: each item must have exactly keys {label, text} and both must be strings."
                     elif stats["dropped_too_short"] > 0:
-                        fix_hint = f"Make snippets longer: each RM turn must be at least {min_words} words."
+                        fix_hint = f"Make snippets longer: each agent turn must be at least {min_words} words."
                     elif stats["dropped_multi_speaker"] > 0:
-                        fix_hint = "Ensure each item is RM-only with no role prefixes or multi-speaker text."
+                        fix_hint = "Ensure each item is agent-only with no role prefixes or multi-speaker text."
                     else:
                         fix_hint = "Follow the prompt constraints more clearly; ensure compliant vs near-miss patterns are obvious."
                     if notes:

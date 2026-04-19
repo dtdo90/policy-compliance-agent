@@ -26,8 +26,6 @@
     "passed_cases_json_path": "data/results/demo/demo_passed_cases.json",
     "borderline_json_path": "data/results/demo/demo_borderline_cases.json",
     "annotation_json_path": "data/results/demo/demo_annotation_output.json",
-    "evaluation_output_path": "data/results/demo/demo_evaluation.json",
-    "evaluation_missed_cases_path": "data/results/demo/demo_missed_cases.json",
     "approved_examples_json_path": "data/results/demo/approved_examples.json",
     "augmented_dataset_path": "data/results/demo/demo_augmented_dataset.json",
     "retriever_versions_dir": "models/demo/retriever_versions",
@@ -83,9 +81,6 @@
     "chunk_overlap": 15,
     "speaker_labels": ["Agent"],
     "annotation": false
-  },
-  "evaluation": {
-    "valid_ground_truth": ["T", "F", "B", "N"]
   },
   "demo": {
     "ollama_url": "http://127.0.0.1:11434",

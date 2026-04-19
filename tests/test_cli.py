@@ -1,7 +1,6 @@
 import sys
 
 from sg_cases.cli import demo_app as demo_app_cli
-from sg_cases.cli import evaluate as evaluate_cli
 from sg_cases.cli import generate_synthetic as generate_cli
 from sg_cases.cli import run_inference as inference_cli
 from sg_cases.cli import train_cross_encoder as ce_cli
@@ -43,25 +42,6 @@ def test_inference_cli_passes_arguments(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["sg-run-inference", "--config", "cfg.yaml", "--input", "data/voice_logs"])
     inference_cli.main()
     assert calls == {"input": "data/voice_logs", "config": "cfg.yaml"}
-
-
-def test_evaluate_cli_passes_arguments(monkeypatch):
-    calls = {}
-    monkeypatch.setattr(
-        evaluate_cli,
-        "evaluate",
-        lambda report_path=None, truth_path=None, config_path=None: calls.update(
-            {"report": report_path, "truth": truth_path, "config": config_path}
-        )
-        or ({}, {}),
-    )
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["sg-evaluate", "--config", "cfg.yaml", "--report", "report.json", "--truth", "truth.json"],
-    )
-    evaluate_cli.main()
-    assert calls == {"report": "report.json", "truth": "truth.json", "config": "cfg.yaml"}
 
 
 def test_demo_app_cli_passes_arguments(monkeypatch):

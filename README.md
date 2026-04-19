@@ -22,6 +22,8 @@ The bundled examples use fictional policies and transcripts.
 - `src/sg_cases/training/`: sentence-transformer and cross-encoder training
 - `tests/`: regression tests for the demo workflow
 
+The Python import namespace is still `sg_cases`; the installable project name is `policy-compliance-agent`.
+
 ## Setup
 
 Install `uv`, then sync the locked project environment:

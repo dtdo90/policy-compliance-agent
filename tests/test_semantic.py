@@ -33,7 +33,7 @@ def fake_semantic_search(query_embeddings, corpus_embeddings, top_k=5):
     return results
 
 
-def test_metadata_rules_can_be_excluded():
+def test_rules_can_be_excluded_by_id():
     disclaimers = [
         Disclaimer("1", "", "", "", "", "", []),
         Disclaimer("2", "", "", "", "", "", []),

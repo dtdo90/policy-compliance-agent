@@ -12,5 +12,5 @@ def test_load_default_config_from_any_working_directory(tmp_path, monkeypatch):
     config = load_config()
 
     assert DEFAULT_CONFIG_PATH.exists()
-    assert config["data"]["disclosures_file"] == "resources/disclosures_with_anchors_sg.json"
-    assert config["semantic_inference"]["include_rule_ids"] == [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    assert config["data"]["disclosures_file"] == "resources/demo_disclosures.json"
+    assert config["semantic_inference"]["include_rule_ids"] == [101, 102]
