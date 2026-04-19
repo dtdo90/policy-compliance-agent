@@ -1,6 +1,6 @@
 # Policy Compliance Agent
 
-Policy Compliance Agent is a personal demo for agentic policy compliance on transcripts. It shows a practical workflow for:
+Policy Compliance Agent is a demo for agentic policy compliance on transcripts. It shows a practical workflow for:
 
 - running policy inference with a retriever and verifier model
 - reviewing pass and borderline evidence with a local LLM
