@@ -1,0 +1,77 @@
+[
+  {
+    "transcript_id": "holdout_helpdesk_good",
+    "title": "Holdout Helpdesk Compliant",
+    "transcript": "Agent: Thanks for calling the helpdesk. Before I reset or unlock your account, I need to verify your identity first. Once we have confirmed your details, I can issue a temporary password right away.",
+    "expected_labels": [
+      {
+        "disclaimer_id": "101",
+        "claim_type": "single",
+        "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+        "label": "Compliant"
+      },
+      {
+        "disclaimer_id": "102",
+        "claim_type": "mandatory",
+        "anchor": "Before I confirm this booking change, there is a change fee that will apply.",
+        "label": "Non-Compliant"
+      },
+      {
+        "disclaimer_id": "102",
+        "claim_type": "mandatory",
+        "anchor": "There is also a fare difference on the new itinerary, so you will either pay the extra amount or receive the balance as travel credit.",
+        "label": "Non-Compliant"
+      }
+    ]
+  },
+  {
+    "transcript_id": "holdout_helpdesk_bad",
+    "title": "Holdout Helpdesk Non-Compliant",
+    "transcript": "Agent: I can unlock the account for you right now so you can get back in, and if anything else comes up we can confirm your details after that.",
+    "expected_labels": [
+      {
+        "disclaimer_id": "101",
+        "claim_type": "single",
+        "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+        "label": "Non-Compliant"
+      },
+      {
+        "disclaimer_id": "102",
+        "claim_type": "mandatory",
+        "anchor": "Before I confirm this booking change, there is a change fee that will apply.",
+        "label": "Non-Compliant"
+      },
+      {
+        "disclaimer_id": "102",
+        "claim_type": "mandatory",
+        "anchor": "There is also a fare difference on the new itinerary, so you will either pay the extra amount or receive the balance as travel credit.",
+        "label": "Non-Compliant"
+      }
+    ]
+  },
+  {
+    "transcript_id": "holdout_travel_full",
+    "title": "Holdout Travel Fully Compliant",
+    "transcript": "Agent: Before I confirm this booking change, there is a change fee that will apply. There is also a fare difference on the new itinerary, so you will need to pay the extra amount before I finalize the change.",
+    "expected_labels": [
+      {
+        "disclaimer_id": "101",
+        "claim_type": "single",
+        "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+        "label": "Non-Compliant"
+      },
+      {
+        "disclaimer_id": "102",
+        "claim_type": "mandatory",
+        "anchor": "Before I confirm this booking change, there is a change fee that will apply.",
+        "label": "Compliant"
+      },
+      {
+        "disclaimer_id": "102",
+        "claim_type": "mandatory",
+        "anchor": "There is also a fare difference on the new itinerary, so you will either pay the extra amount or receive the balance as travel credit.",
+        "label": "Compliant"
+      }
+    ]
+  }
+]

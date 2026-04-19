@@ -1,0 +1,74 @@
+[
+  {
+    "disclaimer_id": "101",
+    "scenario": "helpdesk",
+    "scenario_name": "Standard Helpdesk Tone",
+    "prompt_index": 0,
+    "type": "compliant",
+    "dialogue": "before i reset or unlock your account, i need to verify your identity first.",
+    "source_prompt": "data/prompts/demo_prompts.json"
+  },
+  {
+    "disclaimer_id": "101",
+    "scenario": "helpdesk",
+    "scenario_name": "Busy Support Queue",
+    "prompt_index": 1,
+    "type": "non-compliant",
+    "dialogue": "i'll send the reset now and if the queue asks for verification, we'll handle that after.",
+    "source_prompt": "data/prompts/demo_prompts.json"
+  },
+  {
+    "disclaimer_id": "101",
+    "scenario": "helpdesk",
+    "scenario_name": "Busy Support Queue",
+    "prompt_index": 1,
+    "type": "compliant",
+    "dialogue": "for the unlock, verification comes first, then i can release access.",
+    "source_prompt": "data/prompts/demo_prompts.json"
+  },
+  {
+    "disclaimer_id": "101",
+    "scenario": "helpdesk",
+    "scenario_name": "Standard Helpdesk Tone",
+    "prompt_index": 0,
+    "type": "non-compliant",
+    "dialogue": "i can reset it now and verify your details after the link goes out.",
+    "source_prompt": "data/prompts/demo_prompts.json"
+  },
+  {
+    "disclaimer_id": "102",
+    "scenario": "travel",
+    "scenario_name": "Standard Travel Desk Tone",
+    "prompt_index": 0,
+    "type": "compliant",
+    "dialogue": "before i confirm this booking change, there is a change fee that will apply, and the new itinerary is fifty dollars more so you'd pay that fare difference.",
+    "source_prompt": "data/prompts/demo_prompts.json"
+  },
+  {
+    "disclaimer_id": "102",
+    "scenario": "travel",
+    "scenario_name": "Customer In A Hurry",
+    "prompt_index": 1,
+    "type": "non-compliant",
+    "dialogue": "if you're happy, i'll confirm the change now and mention the charges after.",
+    "source_prompt": "data/prompts/demo_prompts.json"
+  },
+  {
+    "disclaimer_id": "102",
+    "scenario": "travel",
+    "scenario_name": "Customer In A Hurry",
+    "prompt_index": 1,
+    "type": "compliant",
+    "dialogue": "there is a change fee, and because the alternate flight is cheaper you'd get the balance back as travel credit.",
+    "source_prompt": "data/prompts/demo_prompts.json"
+  },
+  {
+    "disclaimer_id": "102",
+    "scenario": "travel",
+    "scenario_name": "Standard Travel Desk Tone",
+    "prompt_index": 0,
+    "type": "non-compliant",
+    "dialogue": "there is a change fee for the reissue, and that's the only cost i need to flag right now.",
+    "source_prompt": "data/prompts/demo_prompts.json"
+  }
+]

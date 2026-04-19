@@ -1,0 +1,32 @@
+[
+  {
+    "transcript_id": "sample_helpdesk_good",
+    "title": "Helpdesk Compliant Example",
+    "transcript": "Agent: Thanks for calling the helpdesk. Before I reset or unlock your account, I need to verify your identity first. Once we've confirmed your details, I'll issue a temporary password right away."
+  },
+  {
+    "transcript_id": "sample_travel_partial",
+    "title": "Travel Partial Disclosure",
+    "transcript": "Agent: I can move you onto the earlier flight. There will be a seventy-five dollar change fee for the exchange, and if you're happy with that I can confirm the new itinerary now."
+  },
+  {
+    "transcript_id": "sample_helpdesk_bad",
+    "title": "Helpdesk Non-Compliant Example",
+    "transcript": "Agent: I'll unlock the account for you now so you can get back in, and if the system asks me for anything else we'll verify your details after that."
+  },
+  {
+    "transcript_id": "sample_helpdesk_conversation_pass_101_fail_102",
+    "title": "Helpdesk Conversation Passes 101 Fails 102",
+    "transcript": "Agent: Thanks for calling the helpdesk, this is Maya speaking. How can I help today?\nUser: Hi Maya, I got locked out after too many password attempts and I need to get back in before a client meeting.\nAgent: I can help with that. Before I reset or unlock your account, I need to verify your identity first.\nUser: Sure, no problem.\nAgent: Please confirm your employee ID for me.\nUser: It's SG48291.\nAgent: Thanks. I've also sent a one-time code to your registered mobile number ending in 4421. Please read that code back when you receive it.\nUser: I have it now, the code is 318604.\nAgent: Great, that matches what I see here, so your identity is verified.\nUser: Perfect, can you unlock it now?\nAgent: Yes, I'm unlocking the account now and I'll also issue a temporary password so you can sign in immediately.\nUser: Thank you.\nAgent: Your temporary password has been sent to your work email, and you'll be prompted to create a new one after login.\nUser: That's fine.\nAgent: Please try signing in again in the next minute, and if anything still looks blocked, stay on the line and I'll check it with you.\nUser: I just got the email, so I'll try it now. Thanks for the help."
+  },
+  {
+    "transcript_id": "sample_travel_conversation_fail_101_pass_102",
+    "title": "Travel Conversation Fails 101 Passes 102",
+    "transcript": "Agent: Good afternoon, you've reached the travel desk, this is Daniel. How can I help today?\nCustomer: Hi Daniel, I need to move my flight from Friday evening to the Saturday morning departure.\nAgent: I can check that for you now.\nCustomer: Great, I just need the earliest option available.\nAgent: I have a seat on the Saturday 8:10 a.m. flight.\nCustomer: That sounds fine.\nAgent: Before I confirm this booking change, there is a change fee that will apply.\nCustomer: Okay, how much is that fee?\nAgent: The airline change fee is eighty dollars for this exchange.\nCustomer: All right.\nAgent: There is also a fare difference on the new itinerary, and this new flight is fifty dollars higher than your current ticket, so you would need to pay that extra amount as well.\nCustomer: So the total additional cost is one hundred thirty dollars?\nAgent: That's right, eighty dollars for the change fee and fifty dollars for the higher fare on the new itinerary.\nCustomer: Okay, please go ahead.\nAgent: Thanks, I'm confirming the change now and I'll send the updated itinerary to your email in the next few minutes.\nCustomer: Perfect, thank you for sorting that out."
+  },
+  {
+    "transcript_id": "sample_travel_borderline_review",
+    "title": "Travel Conversation With Borderline Phrase",
+    "transcript": "Agent: Good morning, this is Amelia at the travel desk. How can I help?\nCustomer: Hi Amelia, I want to move my return flight from Sunday night to Monday morning.\nAgent: I can check what is available.\nCustomer: Thank you, I just need the earliest Monday option.\nAgent: I have one leaving at 8:20 a.m. with the same airline.\nCustomer: That sounds promising.\nAgent: There will be a fee to make the change, and the new flight is a bit higher.\nCustomer: Okay, can you explain that a little more?\nAgent: The airline is treating it as a standard voluntary change.\nCustomer: Understood.\nAgent: I am still waiting for the fare desk to finish updating the exchange screen.\nCustomer: No worries.\nAgent: Once that refreshes, I can tell you whether you want to proceed.\nCustomer: Fine.\nAgent: I just want to make sure the routing still works for you before I touch the booking.\nCustomer: Yes, Monday morning is still best.\nAgent: All right, I am keeping the option on hold for the next few minutes.\nCustomer: Thanks.\nAgent: If you decide to move ahead, I can finalize it once the pricing view settles.\nCustomer: Okay, please let me know when you have it."
+  }
+]

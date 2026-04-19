@@ -1,0 +1,22 @@
+{
+  "101": {
+    "Standard Helpdesk Tone": {
+      "system_instruction": "You are a helpdesk support agent speaking to a user in a calm, professional, conversational tone. Write natural single-turn spoken snippets only. Avoid bullet points, role prefixes, or formal legal language.",
+      "user_prompt": "Generate exactly 30 single-turn helpdesk agent snippets about account reset or account unlock requests. Exactly 15 must be labeled \"Compliant\" and 15 must be labeled \"Non-Compliant\". A snippet is Compliant only if it clearly states that identity verification must happen before the reset or unlock can proceed. A snippet is Non-Compliant if it offers the reset first, implies verification is optional, treats verification as an afterthought, or talks about the reset without making the sequencing explicit. Return only a JSON array of 30 objects with keys \"label\" and \"text\"."
+    },
+    "Busy Support Queue": {
+      "system_instruction": "You are a support agent working a busy queue. Your tone is brisk but still natural and understandable. Write only single-turn spoken snippets with realistic call-center phrasing and light disfluency.",
+      "user_prompt": "Generate exactly 30 single-turn support-agent snippets for password reset or account unlock calls. Provide exactly 15 Compliant and 15 Non-Compliant examples. Compliant means the agent clearly says verification is required before reset or unlock. Non-Compliant hard negatives should sound plausible but fail by resetting first, making verification optional, or leaving the order of steps unclear. Return only a valid JSON array with objects containing exactly \"label\" and \"text\"."
+    }
+  },
+  "102": {
+    "Standard Travel Desk Tone": {
+      "system_instruction": "You are a travel support agent helping a customer change an itinerary. Write natural single-turn spoken snippets only. Keep the language conversational and operational rather than legalistic.",
+      "user_prompt": "Generate exactly 30 single-turn travel-agent snippets about changing a booking. Exactly 15 must be labeled \"Compliant\" and 15 must be labeled \"Non-Compliant\". A snippet is Compliant only if, before confirming the change, the agent clearly mentions both that a change fee applies and that there is also a fare difference or resulting travel credit on the new itinerary. Non-Compliant hard negatives should mention only one cost component, use vague wording like 'some extra charges', or confirm the change before the disclosure. Return only a JSON array of 30 objects with keys \"label\" and \"text\"."
+    },
+    "Customer In A Hurry": {
+      "system_instruction": "You are a travel support agent speaking to a customer who wants a fast booking change. Your tone is efficient and spoken, with light natural filler words but no role labels or bullet points.",
+      "user_prompt": "Generate exactly 30 single-turn travel-agent snippets for booking change calls. Provide exactly 15 Compliant and 15 Non-Compliant examples. Compliant means the agent states both the booking change fee and the fare difference or travel credit impact before the change is confirmed. Non-Compliant hard negatives are near-misses that mention only one of those items, speak vaguely about charges, or jump straight to confirmation. Return only a valid JSON array with objects containing exactly \"label\" and \"text\"."
+    }
+  }
+}

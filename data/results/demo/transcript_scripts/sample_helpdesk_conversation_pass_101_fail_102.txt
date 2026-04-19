@@ -1,0 +1,16 @@
+Agent: Thanks for calling the helpdesk, this is Maya speaking. How can I help today?
+User: Hi Maya, I got locked out after too many password attempts and I need to get back in before a client meeting.
+Agent: I can help with that. Before I reset or unlock your account, I need to verify your identity first.
+User: Sure, no problem.
+Agent: Please confirm your employee ID for me.
+User: It's SG48291.
+Agent: Thanks. I've also sent a one-time code to your registered mobile number ending in 4421. Please read that code back when you receive it.
+User: I have it now, the code is 318604.
+Agent: Great, that matches what I see here, so your identity is verified.
+User: Perfect, can you unlock it now?
+Agent: Yes, I'm unlocking the account now and I'll also issue a temporary password so you can sign in immediately.
+User: Thank you.
+Agent: Your temporary password has been sent to your work email, and you'll be prompted to create a new one after login.
+User: That's fine.
+Agent: Please try signing in again in the next minute, and if anything still looks blocked, stay on the line and I'll check it with you.
+User: I just got the email, so I'll try it now. Thanks for the help.

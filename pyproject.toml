@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sg-cases"
+version = "0.1.0"
+description = "Agentic policy compliance demo for synthetic data, training, inference, and evaluation."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "accelerate>=1.1.0",
+  "datasets>=2.19.0",
+  "numpy>=1.24.0",
+  "pandas>=2.0.0",
+  "rapidfuzz>=3.0.0",
+  "scikit-learn>=1.3.0",
+  "sentence-transformers>=3.0.0",
+  "torch>=2.1.0",
+  "tqdm>=4.66.0",
+  "transformers>=4.40.0",
+]
+
+[project.optional-dependencies]
+inference-extra = [
+  "gliner>=0.2.0",
+]
+metadata = [
+  "pyspark>=3.5.0",
+]
+demo = [
+  "gradio>=4.44.0",
+]
+dev = [
+  "pytest>=8.0.0",
+]
+
+[project.scripts]
+sg-generate-synthetic = "sg_cases.cli.generate_synthetic:main"
+sg-train-ce = "sg_cases.cli.train_cross_encoder:main"
+sg-train-st = "sg_cases.cli.train_sentence_transformer:main"
+sg-run-inference = "sg_cases.cli.run_inference:main"
+sg-evaluate = "sg_cases.cli.evaluate:main"
+sg-demo-app = "sg_cases.cli.demo_app:main"
+sg-agentic-loop = "sg_cases.cli.agentic_loop:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

@@ -1,0 +1,16 @@
+Agent: Good afternoon, you've reached the travel desk, this is Daniel. How can I help today?
+Customer: Hi Daniel, I need to move my flight from Friday evening to the Saturday morning departure.
+Agent: I can check that for you now.
+Customer: Great, I just need the earliest option available.
+Agent: I have a seat on the Saturday 8:10 a.m. flight.
+Customer: That sounds fine.
+Agent: Before I confirm this booking change, there is a change fee that will apply.
+Customer: Okay, how much is that fee?
+Agent: The airline change fee is eighty dollars for this exchange.
+Customer: All right.
+Agent: There is also a fare difference on the new itinerary, and this new flight is fifty dollars higher than your current ticket, so you would need to pay that extra amount as well.
+Customer: So the total additional cost is one hundred thirty dollars?
+Agent: That's right, eighty dollars for the change fee and fifty dollars for the higher fare on the new itinerary.
+Customer: Okay, please go ahead.
+Agent: Thanks, I'm confirming the change now and I'll send the updated itinerary to your email in the next few minutes.
+Customer: Perfect, thank you for sorting that out.

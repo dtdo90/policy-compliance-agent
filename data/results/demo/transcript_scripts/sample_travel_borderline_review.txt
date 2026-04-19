@@ -1,0 +1,20 @@
+Agent: Good morning, this is Amelia at the travel desk. How can I help?
+Customer: Hi Amelia, I want to move my return flight from Sunday night to Monday morning.
+Agent: I can check what is available.
+Customer: Thank you, I just need the earliest Monday option.
+Agent: I have one leaving at 8:20 a.m. with the same airline.
+Customer: That sounds promising.
+Agent: There will be a fee to make the change, and the new flight is a bit higher.
+Customer: Okay, can you explain that a little more?
+Agent: The airline is treating it as a standard voluntary change.
+Customer: Understood.
+Agent: I am still waiting for the fare desk to finish updating the exchange screen.
+Customer: No worries.
+Agent: Once that refreshes, I can tell you whether you want to proceed.
+Customer: Fine.
+Agent: I just want to make sure the routing still works for you before I touch the booking.
+Customer: Yes, Monday morning is still best.
+Agent: All right, I am keeping the option on hold for the next few minutes.
+Customer: Thanks.
+Agent: If you decide to move ahead, I can finalize it once the pricing view settles.
+Customer: Okay, please let me know when you have it.

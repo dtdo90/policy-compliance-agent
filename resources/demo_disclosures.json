@@ -1,0 +1,48 @@
+{
+  "101": {
+    "Theme": "Helpdesk Security",
+    "Description": "Support agent requires identity verification before resetting or unlocking the account.",
+    "Purpose_of_control": "Detect resets or unlocks that are offered before the customer is explicitly told verification must happen first.",
+    "Criteria": "Verification is required before reset or unlock.",
+    "Keywords": [
+      {
+        "Standard messages": [
+          "verify your identity first",
+          "before I reset the account",
+          "before I unlock the account"
+        ]
+      }
+    ],
+    "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+    "anchor_meta": {
+      "applied_when": "Whenever the customer requests a password reset or account unlock.",
+      "standard_intent": "The agent must clearly state that reset or unlock cannot proceed until identity verification happens."
+    }
+  },
+  "102": {
+    "Theme": "Travel Change Disclosure",
+    "Description": "Travel agent discloses the change fee and fare difference or credit before confirming the booking change.",
+    "Purpose_of_control": "Detect booking changes that are confirmed without the customer being told both cost components up front.",
+    "Criteria": "Before confirmation, disclose the change fee and the fare difference or resulting travel credit.",
+    "Keywords": [
+      {
+        "Standard messages": [
+          "change fee applies",
+          "fare difference",
+          "travel credit"
+        ]
+      }
+    ],
+    "anchor": {
+      "mandatory": [
+        "Before I confirm this booking change, there is a change fee that will apply.",
+        "There is also a fare difference on the new itinerary, so you will either pay the extra amount or receive the balance as travel credit."
+      ],
+      "standard": []
+    },
+    "anchor_meta": {
+      "applied_when": "Whenever the customer asks to change a travel booking.",
+      "standard_intent": "The agent must disclose the change fee and the fare difference or credit outcome before confirming the change."
+    }
+  }
+}

@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.DS_Store
+.pytest_cache/
+
+.venv/
+.venv-local/
+
+build/
+dist/
+.coverage
+htmlcov/
+
+# Local model/checkpoint artifacts are generated from the synthetic dataset.
+models/
+data/results/checkpoints/
+data/results/demo/checkpoints/
+data/results/demo/agentic/
+data/results/demo/approved_examples.json
+data/results/demo/demo_augmented_dataset.json
+data/results/demo/*_transcript.txt
+
+# Older non-demo artifacts kept locally but not needed for the public demo.
+data/results/SG_synthetic_data/
+resources/disclosures_with_anchors_sg.json
+resources/images/uob_logo.png
