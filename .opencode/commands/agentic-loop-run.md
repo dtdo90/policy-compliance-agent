@@ -8,7 +8,7 @@ Run the local Agentic Loop with any extra CLI arguments the user supplied after 
 Use:
 
 ```bash
-.venv-local/bin/python -m sg_cases.cli.agentic_loop --config configs/demo.yaml $ARGUMENTS
+uv run python -m sg_cases.cli.agentic_loop --config configs/demo.yaml $ARGUMENTS
 ```
 
 After the command finishes, inspect:

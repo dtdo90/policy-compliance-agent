@@ -24,16 +24,21 @@ The bundled examples use fictional policies and transcripts.
 
 ## Setup
 
-Create a local environment:
+Install `uv`, then sync the locked project environment:
 
 ```bash
-python3 -m venv .venv-local
-source .venv-local/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[demo,dev]"
+curl -LsSf https://astral.sh/uv/install.sh | sh
+uv sync --extra demo --extra dev
 ```
 
-Optional local LLM support:
+Install OpenCode if you want to use the agentic wrapper:
+
+```bash
+curl -fsSL https://opencode.ai/install | bash
+opencode --version
+```
+
+Optional local LLM support for app chat and labeling:
 
 ```bash
 ollama pull qwen3:4b
@@ -47,17 +52,15 @@ The app still runs without Ollama for deterministic inference, but LLM-assisted 
 The trained demo models are generated locally and are not committed to git.
 
 ```bash
-source .venv-local/bin/activate
-python -m sg_cases.cli.train_sentence_transformer --config configs/demo.yaml
-python -m sg_cases.cli.train_cross_encoder --config configs/demo.yaml
-python -c "from sg_cases.demo import freeze_current_demo_baseline; freeze_current_demo_baseline(config_path='configs/demo.yaml')"
+uv run python -m sg_cases.cli.train_sentence_transformer --config configs/demo.yaml
+uv run python -m sg_cases.cli.train_cross_encoder --config configs/demo.yaml
+uv run python -c "from sg_cases.demo import freeze_current_demo_baseline; freeze_current_demo_baseline(config_path='configs/demo.yaml')"
 ```
 
 ## Run The App
 
 ```bash
-source .venv-local/bin/activate
-python -m sg_cases.cli.demo_app --config configs/demo.yaml
+uv run python -m sg_cases.cli.demo_app --config configs/demo.yaml
 ```
 
 Open:
@@ -69,14 +72,13 @@ http://127.0.0.1:7860
 ## Run The Agentic Loop CLI
 
 ```bash
-source .venv-local/bin/activate
-python -m sg_cases.cli.agentic_loop --config configs/demo.yaml
+uv run python -m sg_cases.cli.agentic_loop --config configs/demo.yaml
 ```
 
 With a folder of transcript `.txt` files:
 
 ```bash
-python -m sg_cases.cli.agentic_loop \
+uv run python -m sg_cases.cli.agentic_loop \
   --config configs/demo.yaml \
   --transcripts data/results/demo/transcript_scripts
 ```
@@ -84,7 +86,7 @@ python -m sg_cases.cli.agentic_loop \
 Require manual review instead of auto-approval:
 
 ```bash
-python -m sg_cases.cli.agentic_loop \
+uv run python -m sg_cases.cli.agentic_loop \
   --config configs/demo.yaml \
   --require-human-review
 ```
@@ -92,22 +94,21 @@ python -m sg_cases.cli.agentic_loop \
 ## Run Tests
 
 ```bash
-source .venv-local/bin/activate
-python -m pytest
+uv run pytest
 ```
 
-## Data Policy
+## Retraining Data
 
-- Keep the original synthetic dataset unchanged.
-- Each retraining run should use only `original synthetic dataset + latest approved phrases`.
-- Avoid accumulating approved phrases across unrelated runs.
-- Keep examples synthetic and easy to review.
+- The original synthetic dataset is kept unchanged.
+- Each retraining run uses `original synthetic dataset + latest approved phrases`.
+- Approved phrases are overwritten per run to avoid mixing unrelated experiments.
 
 ## OpenCode
 
 OpenCode is optional. It provides an agent-style way to run and inspect the same deterministic Python loop.
 
 ```bash
+uv sync --extra demo --extra dev
 opencode
 ```
 

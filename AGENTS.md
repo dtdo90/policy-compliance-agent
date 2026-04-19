@@ -4,11 +4,12 @@ This project is a personal demo for agentic policy review. The core workflow is 
 
 ## Useful Commands
 
-- Run the local Agentic Loop: `.venv-local/bin/python -m sg_cases.cli.agentic_loop --config configs/demo.yaml`
-- Require human review: `.venv-local/bin/python -m sg_cases.cli.agentic_loop --config configs/demo.yaml --require-human-review`
-- Auto-approve LLM labels: `.venv-local/bin/python -m sg_cases.cli.agentic_loop --config configs/demo.yaml --auto-approve-llm`
-- Run tests: `.venv-local/bin/python -m pytest`
-- Launch the Gradio app: `.venv-local/bin/python -m sg_cases.cli.demo_app --config configs/demo.yaml`
+- Sync dependencies: `uv sync --extra demo --extra dev`
+- Run the local Agentic Loop: `uv run python -m sg_cases.cli.agentic_loop --config configs/demo.yaml`
+- Require human review: `uv run python -m sg_cases.cli.agentic_loop --config configs/demo.yaml --require-human-review`
+- Auto-approve LLM labels: `uv run python -m sg_cases.cli.agentic_loop --config configs/demo.yaml --auto-approve-llm`
+- Run tests: `uv run pytest`
+- Launch the Gradio app: `uv run python -m sg_cases.cli.demo_app --config configs/demo.yaml`
 
 ## Agentic Loop Contract
 

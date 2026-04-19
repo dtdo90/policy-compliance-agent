@@ -18,21 +18,33 @@ This project keeps the Agentic Loop deterministic in Python, then uses OpenCode 
 
 ## How To Use It
 
-1. Install OpenCode if it is not available on the laptop.
-2. Make sure Ollama is running and the local model exists:
+1. Sync the Python environment:
+
+```bash
+uv sync --extra demo --extra dev
+```
+
+2. Install OpenCode if it is not available:
+
+```bash
+curl -fsSL https://opencode.ai/install | bash
+opencode --version
+```
+
+3. Make sure Ollama is running and the local model exists:
 
 ```bash
 ollama pull qwen3:4b
 ollama serve
 ```
 
-3. Start OpenCode from this project root:
+4. Start OpenCode from this project root:
 
 ```bash
 opencode
 ```
 
-4. Try these slash commands:
+5. Try these slash commands:
 
 ```text
 /agentic-loop-run
