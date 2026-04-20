@@ -5,16 +5,16 @@ This project is a personal demo for agentic policy compliance. The core workflow
 ## Useful Commands
 
 - Sync dependencies: `uv sync --extra demo --extra dev`
-- Run the local Agentic Loop: `uv run python -m sg_cases.cli.agentic_loop --config configs/demo.yaml`
-- Require human review: `uv run python -m sg_cases.cli.agentic_loop --config configs/demo.yaml --require-human-review`
-- Auto-approve LLM labels: `uv run python -m sg_cases.cli.agentic_loop --config configs/demo.yaml --auto-approve-llm`
+- Run the local Agentic Loop: `uv run policy-agentic-loop --config configs/demo.yaml`
+- Require human review: `uv run policy-agentic-loop --config configs/demo.yaml --require-human-review`
+- Auto-approve LLM labels: `uv run policy-agentic-loop --config configs/demo.yaml --auto-approve-llm`
 - Run tests: `uv run pytest`
-- Launch the Gradio app: `uv run python -m sg_cases.cli.demo_app --config configs/demo.yaml`
+- Launch the Gradio app: `uv run policy-demo-app --config configs/demo.yaml`
 
 ## Agentic Loop Contract
 
-- The Python source of truth is `src/sg_cases/agentic/loop.py`.
-- The app-facing Agentic Loop tab is in `src/sg_cases/demo/app.py`.
+- The Python source of truth is `src/policy_compliance_agent/agentic/loop.py`.
+- The app-facing Agentic Loop tab is in `src/policy_compliance_agent/demo/app.py`.
 - Configuration lives in `configs/demo.yaml`.
 - Loop artifacts are written under `data/results/demo/agentic`.
 - Synthetic data lives at `data/results/demo/demo_synthetic_dataset.json`.

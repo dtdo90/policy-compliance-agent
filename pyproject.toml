@@ -29,12 +29,12 @@ dev = [
 ]
 
 [project.scripts]
-sg-generate-synthetic = "sg_cases.cli.generate_synthetic:main"
-sg-train-ce = "sg_cases.cli.train_cross_encoder:main"
-sg-train-st = "sg_cases.cli.train_sentence_transformer:main"
-sg-run-inference = "sg_cases.cli.run_inference:main"
-sg-demo-app = "sg_cases.cli.demo_app:main"
-sg-agentic-loop = "sg_cases.cli.agentic_loop:main"
+policy-generate-synthetic = "policy_compliance_agent.cli.generate_synthetic:main"
+policy-train-retriever = "policy_compliance_agent.cli.train_sentence_transformer:main"
+policy-train-verifier = "policy_compliance_agent.cli.train_cross_encoder:main"
+policy-run-inference = "policy_compliance_agent.cli.run_inference:main"
+policy-demo-app = "policy_compliance_agent.cli.demo_app:main"
+policy-agentic-loop = "policy_compliance_agent.cli.agentic_loop:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

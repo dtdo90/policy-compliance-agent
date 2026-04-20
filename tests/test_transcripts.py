@@ -1,4 +1,4 @@
-from sg_cases.core.transcripts import extract_speaker_text, load_transcripts_from_folder, load_transcripts_structured_from_txt
+from policy_compliance_agent.core.transcripts import extract_speaker_text, load_transcripts_from_folder, load_transcripts_structured_from_txt
 
 
 def test_load_plain_and_diarized_transcripts(tmp_path):

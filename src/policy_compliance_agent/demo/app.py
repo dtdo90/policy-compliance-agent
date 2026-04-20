@@ -1363,7 +1363,7 @@ def _materialize_incoming_source(
         txt_paths = [path for path in folder_paths if path.suffix.lower() == ".txt"]
         if not txt_paths:
             return None, cleanup_paths, "The uploaded folder must contain at least one `.txt` transcript file."
-        temp_dir = Path(tempfile.mkdtemp(prefix="sg_cases_incoming_"))
+        temp_dir = Path(tempfile.mkdtemp(prefix="policy_compliance_agent_incoming_"))
         cleanup_paths.append(temp_dir)
         _copy_uploaded_paths_to_temp(txt_paths, temp_dir)
         return str(temp_dir), cleanup_paths, None
@@ -1374,14 +1374,14 @@ def _materialize_incoming_source(
             return str(uploaded_paths[0]), cleanup_paths, None
         if suffixes != {".txt"}:
             return None, cleanup_paths, "Upload either a single `.txt`/`.json` file, multiple `.txt` files, or one folder of `.txt` files."
-        temp_dir = Path(tempfile.mkdtemp(prefix="sg_cases_incoming_"))
+        temp_dir = Path(tempfile.mkdtemp(prefix="policy_compliance_agent_incoming_"))
         cleanup_paths.append(temp_dir)
         _copy_uploaded_paths_to_temp(uploaded_paths, temp_dir)
         return str(temp_dir), cleanup_paths, None
 
     transcript = str(transcript_text or "").strip()
     if transcript:
-        temp_dir = Path(tempfile.mkdtemp(prefix="sg_cases_incoming_"))
+        temp_dir = Path(tempfile.mkdtemp(prefix="policy_compliance_agent_incoming_"))
         cleanup_paths.append(temp_dir)
         transcript_path = temp_dir / "interactive_transcript.txt"
         transcript_path.write_text(transcript, encoding="utf-8")

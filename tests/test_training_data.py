@@ -1,9 +1,9 @@
 import json
 from pathlib import Path
 
-from sg_cases.training.cross_encoder import prepare_training_rows
-from sg_cases.training.data_utils import resolve_training_anchor_text
-from sg_cases.training.sentence_transformer import generate_triplet_rows
+from policy_compliance_agent.training.cross_encoder import prepare_training_rows
+from policy_compliance_agent.training.data_utils import resolve_training_anchor_text
+from policy_compliance_agent.training.sentence_transformer import generate_triplet_rows
 
 
 def _load_disclosures():

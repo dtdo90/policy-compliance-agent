@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from sg_cases.core.config import load_config
-from sg_cases.core.paths import DEFAULT_CONFIG_PATH
+from policy_compliance_agent.core.config import load_config
+from policy_compliance_agent.core.paths import DEFAULT_CONFIG_PATH
 
 
 def test_load_default_config_from_any_working_directory(tmp_path, monkeypatch):

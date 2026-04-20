@@ -4,7 +4,7 @@ import shutil
 import pandas as pd
 import pytest
 
-from sg_cases.demo import app as demo_app
+from policy_compliance_agent.demo import app as demo_app
 
 
 def test_borderline_dataframe_defaults_to_unselected_blank_human_labels():

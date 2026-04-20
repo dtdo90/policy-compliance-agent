@@ -1,17 +1,17 @@
 import sys
 
-from sg_cases.cli import demo_app as demo_app_cli
-from sg_cases.cli import generate_synthetic as generate_cli
-from sg_cases.cli import run_inference as inference_cli
-from sg_cases.cli import train_cross_encoder as ce_cli
-from sg_cases.cli import train_sentence_transformer as st_cli
-from sg_cases.cli import agentic_loop as agentic_loop_cli
+from policy_compliance_agent.cli import demo_app as demo_app_cli
+from policy_compliance_agent.cli import generate_synthetic as generate_cli
+from policy_compliance_agent.cli import run_inference as inference_cli
+from policy_compliance_agent.cli import train_cross_encoder as ce_cli
+from policy_compliance_agent.cli import train_sentence_transformer as st_cli
+from policy_compliance_agent.cli import agentic_loop as agentic_loop_cli
 
 
 def test_generate_cli_passes_config(monkeypatch):
     calls = {}
     monkeypatch.setattr(generate_cli, "generate", lambda config_path=None: calls.setdefault("config", config_path) or "ok")
-    monkeypatch.setattr(sys, "argv", ["sg-generate-synthetic", "--config", "cfg.yaml"])
+    monkeypatch.setattr(sys, "argv", ["policy-generate-synthetic", "--config", "cfg.yaml"])
     generate_cli.main()
     assert calls["config"] == "cfg.yaml"
 
@@ -19,7 +19,7 @@ def test_generate_cli_passes_config(monkeypatch):
 def test_train_ce_cli_passes_config(monkeypatch):
     calls = {}
     monkeypatch.setattr(ce_cli, "train_cross_encoder", lambda config_path=None: calls.setdefault("config", config_path) or "ok")
-    monkeypatch.setattr(sys, "argv", ["sg-train-ce", "--config", "cfg.yaml"])
+    monkeypatch.setattr(sys, "argv", ["policy-train-verifier", "--config", "cfg.yaml"])
     ce_cli.main()
     assert calls["config"] == "cfg.yaml"
 
@@ -27,7 +27,7 @@ def test_train_ce_cli_passes_config(monkeypatch):
 def test_train_st_cli_passes_config(monkeypatch):
     calls = {}
     monkeypatch.setattr(st_cli, "train_sentence_transformer", lambda config_path=None: calls.setdefault("config", config_path) or "ok")
-    monkeypatch.setattr(sys, "argv", ["sg-train-st", "--config", "cfg.yaml"])
+    monkeypatch.setattr(sys, "argv", ["policy-train-retriever", "--config", "cfg.yaml"])
     st_cli.main()
     assert calls["config"] == "cfg.yaml"
 
@@ -39,7 +39,7 @@ def test_inference_cli_passes_arguments(monkeypatch):
         "run_semantic_inference",
         lambda input_path=None, config_path=None: calls.update({"input": input_path, "config": config_path}),
     )
-    monkeypatch.setattr(sys, "argv", ["sg-run-inference", "--config", "cfg.yaml", "--input", "data/voice_logs"])
+    monkeypatch.setattr(sys, "argv", ["policy-run-inference", "--config", "cfg.yaml", "--input", "data/voice_logs"])
     inference_cli.main()
     assert calls == {"input": "data/voice_logs", "config": "cfg.yaml"}
 
@@ -47,7 +47,7 @@ def test_inference_cli_passes_arguments(monkeypatch):
 def test_demo_app_cli_passes_arguments(monkeypatch):
     calls = {}
 
-    from sg_cases.demo import app as demo_app_module
+    from policy_compliance_agent.demo import app as demo_app_module
 
     monkeypatch.setattr(
         demo_app_module,
@@ -64,7 +64,7 @@ def test_demo_app_cli_passes_arguments(monkeypatch):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["sg-demo-app", "--config", "configs/demo.yaml", "--server-name", "0.0.0.0", "--server-port", "9000", "--share"],
+        ["policy-demo-app", "--config", "configs/demo.yaml", "--server-name", "0.0.0.0", "--server-port", "9000", "--share"],
     )
 
     demo_app_cli.main()
@@ -95,7 +95,7 @@ def test_agentic_loop_cli_passes_arguments(monkeypatch):
     monkeypatch.setattr(
         sys,
         "argv",
-        ["sg-agentic-loop", "--config", "configs/demo.yaml", "--transcripts", "demo.json", "--holdout", "holdout.json", "--require-human-review"],
+        ["policy-agentic-loop", "--config", "configs/demo.yaml", "--transcripts", "demo.json", "--holdout", "holdout.json", "--require-human-review"],
     )
 
     agentic_loop_cli.main()

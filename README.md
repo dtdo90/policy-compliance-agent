@@ -2,13 +2,13 @@
 
 Policy Compliance Agent is a demo for agentic policy compliance on transcripts. It shows a practical workflow for:
 
-- running policy inference with a retriever and verifier model
-- reviewing pass and borderline evidence with a local LLM
-- approving new training phrases with human oversight
-- retraining on the original synthetic dataset plus the latest approved phrases
-- comparing before/after scores and diagnosing regressions
+1. running policy inference with a retriever and verifier model
+2. reviewing pass and borderline evidence with a local LLM
+3. approving new training phrases with human oversight
+4. retraining on the original synthetic dataset plus the latest approved phrases
+5. comparing before/after scores and diagnosing regressions
 
-The bundled examples use fictional policies and transcripts.
+The demo models two transcript controls as semantic anchors. Rule 101 checks whether a helpdesk agent makes identity verification mandatory before an account reset or unlock, using one anchor for "verify identity before reset/unlock." Rule 102 checks whether a travel agent discloses both required booking-change costs before confirmation, using two mandatory anchors: one for the change fee and one for the fare difference or travel-credit impact. Rule 101 passes only when verification is clearly required before reset/unlock; Rule 102 passes only when both cost disclosures appear before the booking change is confirmed.
 
 ## Project Layout
 
@@ -16,13 +16,13 @@ The bundled examples use fictional policies and transcripts.
 - `resources/demo_disclosures.json`: synthetic demo policy anchors
 - `data/results/demo/demo_synthetic_dataset.json`: original synthetic training dataset
 - `data/results/demo/transcript_scripts/`: sample transcript text files
-- `src/sg_cases/demo/`: Gradio app and app-facing services
-- `src/sg_cases/agentic/`: deterministic agentic loop orchestration
-- `src/sg_cases/inference/`: retriever and verifier inference
-- `src/sg_cases/training/`: sentence-transformer and cross-encoder training
+- `src/policy_compliance_agent/demo/`: Gradio app and app-facing services
+- `src/policy_compliance_agent/agentic/`: deterministic agentic loop orchestration
+- `src/policy_compliance_agent/inference/`: retriever and verifier inference
+- `src/policy_compliance_agent/training/`: sentence-transformer and cross-encoder training
 - `tests/`: regression tests for the demo workflow
 
-The Python import namespace is still `sg_cases`; the installable project name is `policy-compliance-agent`.
+The source root is `src/`; the Python package imports as `policy_compliance_agent`.
 
 ## Setup
 
@@ -54,15 +54,15 @@ The app still runs without Ollama for deterministic inference, but LLM-assisted 
 The trained demo models are generated locally and are not committed to git.
 
 ```bash
-uv run python -m sg_cases.cli.train_sentence_transformer --config configs/demo.yaml
-uv run python -m sg_cases.cli.train_cross_encoder --config configs/demo.yaml
-uv run python -c "from sg_cases.demo import freeze_current_demo_baseline; freeze_current_demo_baseline(config_path='configs/demo.yaml')"
+uv run policy-train-retriever --config configs/demo.yaml
+uv run policy-train-verifier --config configs/demo.yaml
+uv run python -c "from policy_compliance_agent.demo import freeze_current_demo_baseline; freeze_current_demo_baseline(config_path='configs/demo.yaml')"
 ```
 
 ## Run The App
 
 ```bash
-uv run python -m sg_cases.cli.demo_app --config configs/demo.yaml
+uv run policy-demo-app --config configs/demo.yaml
 ```
 
 Open:
@@ -74,13 +74,13 @@ http://127.0.0.1:7860
 ## Run The Agentic Loop CLI
 
 ```bash
-uv run python -m sg_cases.cli.agentic_loop --config configs/demo.yaml
+uv run policy-agentic-loop --config configs/demo.yaml
 ```
 
 With a folder of transcript `.txt` files:
 
 ```bash
-uv run python -m sg_cases.cli.agentic_loop \
+uv run policy-agentic-loop \
   --config configs/demo.yaml \
   --transcripts data/results/demo/transcript_scripts
 ```
@@ -88,7 +88,7 @@ uv run python -m sg_cases.cli.agentic_loop \
 Require manual review instead of auto-approval:
 
 ```bash
-uv run python -m sg_cases.cli.agentic_loop \
+uv run policy-agentic-loop \
   --config configs/demo.yaml \
   --require-human-review
 ```

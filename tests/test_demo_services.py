@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from sg_cases.demo import services as demo_services
+from policy_compliance_agent.demo import services as demo_services
 
 
 class FakeOllamaClient:

@@ -1,7 +1,7 @@
 import json
 
-from sg_cases.agentic import loop as agentic_loop
-from sg_cases.demo import services as demo_services
+from policy_compliance_agent.agentic import loop as agentic_loop
+from policy_compliance_agent.demo import services as demo_services
 
 
 class GapAuditClient:

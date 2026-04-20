@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from sg_cases.core.config import load_config
+from policy_compliance_agent.core.config import load_config
 
 
 def test_demo_disclosures_use_expected_anchor_shapes():

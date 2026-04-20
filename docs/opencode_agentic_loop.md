@@ -65,8 +65,8 @@ This means the demo has two views of the same loop:
 
 ## Source Of Truth
 
-- Orchestrator: `src/sg_cases/agentic/loop.py`
-- CLI: `src/sg_cases/cli/agentic_loop.py`
+- Orchestrator: `src/policy_compliance_agent/agentic/loop.py`
+- CLI: `src/policy_compliance_agent/cli/agentic_loop.py`
 - Config: `configs/demo.yaml`
 - Artifacts: `data/results/demo/agentic`
 - Synthetic dataset: `data/results/demo/demo_synthetic_dataset.json`

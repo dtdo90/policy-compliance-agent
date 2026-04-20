@@ -1,7 +1,7 @@
-from sg_cases.core.disclosures import filter_disclaimers
-from sg_cases.core.models import Disclaimer
-from sg_cases.core.config import load_config
-from sg_cases.inference import SemanticComplianceAnalyzer, aggregate_rule_result
+from policy_compliance_agent.core.disclosures import filter_disclaimers
+from policy_compliance_agent.core.models import Disclaimer
+from policy_compliance_agent.core.config import load_config
+from policy_compliance_agent.inference import SemanticComplianceAnalyzer, aggregate_rule_result
 
 
 class FakeRetriever:
