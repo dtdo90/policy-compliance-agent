@@ -10,16 +10,18 @@ Policy Compliance Agent is a demo for agentic policy compliance on transcripts. 
 
 ## Problem And Methodology
 
-The demo is framed around a travel agency that wants to study whether its support agents follow required customer-protection practices in call transcripts. The goal is to turn policy rules into machine-checkable semantic anchors, run inference over agent speech, and use human-reviewed LLM feedback to improve the training data over time.
-
-The workflow currently covers two rules:
-
-1. Rule 101: Identity verification must be required before an account reset or unlock.
-2. Rule 102: Before confirming a booking change, the agent must disclose both the change fee and the fare difference or travel-credit impact.
-
-Each rule is formulated as one or more anchors. Rule 101 is represented by a single anchor about verifying identity before reset/unlock. Rule 102 is represented by two mandatory anchors: one for the change fee and one for the fare-difference or travel-credit impact. Rule 101 passes only when the identity-verification requirement appears before reset/unlock; Rule 102 passes only when both mandatory cost disclosures appear before the booking change is confirmed.
-
-At inference time, the system extracts agent-spoken text, splits it into overlapping chunks, retrieves the top matching chunks for each anchor with a sentence-transformer model, and scores the best candidates with a cross-encoder verifier. Low-confidence or review-worthy phrases are sent to a local LLM for suggested labels, then a human can approve selected phrases for retraining. The retraining loop rebuilds the retriever and verifier from the original synthetic dataset plus the latest approved additions, then compares before/after scores.
+- Scenario: A travel agency wants to study whether its support agents follow required customer-protection practices in call transcripts.
+- Goal: Turn policy rules into machine-checkable semantic anchors, run inference over agent speech, and use human-reviewed LLM feedback to improve the training data over time.
+- Rule 101: Identity verification must be required before an account reset or unlock.
+- Rule 101 anchor: "Before I reset or unlock your account, I need to verify your identity first."
+- Rule 101 pass criteria: Pass only when the agent clearly makes identity verification required before reset/unlock.
+- Rule 102: Before confirming a booking change, the agent must disclose both the change fee and the fare difference or travel-credit impact.
+- Rule 102 anchor 1: "Before I confirm this booking change, there is a change fee that will apply."
+- Rule 102 anchor 2: "There is also a fare difference on the new itinerary, so you will either pay the extra amount or receive the balance as travel credit."
+- Rule 102 pass criteria: Pass only when both mandatory cost disclosures appear before the booking change is confirmed.
+- Inference methodology: Extract agent-spoken text, split it into overlapping chunks, retrieve the top matching chunks for each anchor with a sentence-transformer model, and score the best candidates with a cross-encoder verifier.
+- Review methodology: Send low-confidence or review-worthy phrases to a local LLM for suggested labels, then let a human approve selected phrases for retraining.
+- Retraining methodology: Rebuild the retriever and verifier from the original synthetic dataset plus the latest approved additions, then compare before/after scores.
 
 ## Project Layout
 
