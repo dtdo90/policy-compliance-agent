@@ -214,6 +214,7 @@ def run_demo_inference(
         "results": results,
     }
     payload["borderline_items"] = get_borderline_items(payload, config=config)
+    payload["review_items"] = get_agentic_review_items(payload, config=config)
     return payload
 
 
@@ -355,6 +356,26 @@ def get_agentic_review_items(
         )
     )
     return items
+
+
+def review_item_needs_human_approval(item: dict[str, Any]) -> bool:
+    """Keep all borderline rows plus model-pass rows that Qwen rejects."""
+    review_type = str(item.get("review_type", "")).strip().lower()
+    if review_type == "borderline":
+        return True
+    if review_type != "pass":
+        return False
+
+    model_label = (
+        _review_label_to_model_label(item.get("model_label"))
+        or _model_label_from_score(float(item.get("verification_score") or 0.0))
+    )
+    qwen_label = _review_label_to_model_label(item.get("llm_label") or item.get("qwen_label"))
+    return model_label == "Compliant" and qwen_label == "Non-Compliant"
+
+
+def filter_review_items_for_human_approval(items: Iterable[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [item for item in items if isinstance(item, dict) and review_item_needs_human_approval(item)]
 
 
 def _parse_llm_json(text: str) -> dict[str, Any]:
@@ -704,14 +725,14 @@ def label_review_items_with_ollama(
 
     suggestions: list[dict[str, Any]] = []
     system_prompt = (
-        "You are helping review borderline compliance matches for a privacy-safe demo app.\n"
+        "You are helping review compliance matches for a privacy-safe demo app.\n"
         "Use non-thinking mode. Do not reveal reasoning or chain-of-thought.\n"
         "Judge the candidate phrase against the specific target anchor only.\n"
         "Do not require the phrase to satisfy any other anchors from the same rule.\n"
         "Treat the target anchor semantically, not as an exact quote.\n"
         "Equivalent paraphrases count as Compliant when the core meaning is clearly present.\n"
         "Do not over-penalize missing framing words such as 'before I confirm' or 'before I reset' if the core disclosure or requirement is conveyed.\n"
-        "These are borderline candidates, so keep confidence moderate rather than extreme.\n"
+        "Candidates may be borderline or model-pass phrases; keep confidence calibrated and avoid extreme confidence unless the match is very clear.\n"
         "Do not include chain-of-thought, markdown, or explanatory prose outside JSON.\n"
         "Return exactly one valid JSON object with keys: label, confidence, rationale.\n"
         'label must be exactly "Compliant" or "Non-Compliant".'
@@ -725,6 +746,8 @@ def label_review_items_with_ollama(
             "target_anchor": item.get("anchor", ""),
             "candidate_phrase": item.get("text", ""),
             "current_verification_score": item.get("verification_score", 0.0),
+            "model_label": item.get("model_label") or _model_label_from_score(float(item.get("verification_score") or 0.0)),
+            "review_type": item.get("review_type", ""),
         }
         raw_response = client.chat(
             system_prompt=system_prompt,
@@ -1701,13 +1724,9 @@ def run_agentic_review_cycle(
         _json_save("data/results/demo/agentic/app_loop_review.json", result)
         return result
 
-    borderline_items = [item for item in review_items if item.get("review_type") == "borderline"]
-    pass_items = [item for item in review_items if item.get("review_type") == "pass"]
-
     try:
-        labeled_borderline_items = label_review_items_with_ollama(borderline_items, config=config, client=client) if borderline_items else []
-        labeled_items = [*labeled_borderline_items, *pass_items]
-        labeled_items.sort(
+        labeled_candidates = label_review_items_with_ollama(review_items, config=config, client=client)
+        labeled_candidates.sort(
             key=lambda item: (
                 str(item.get("transcript_id", "")),
                 str(item.get("disclaimer_id", "")),
@@ -1715,12 +1734,14 @@ def run_agentic_review_cycle(
                 0 if item.get("review_type") == "borderline" else 1,
             )
         )
+        labeled_items = filter_review_items_for_human_approval(labeled_candidates)
         classifier_status = {
             "agent": "ClassifierAgent",
             "status": "completed",
-            "message": f"Classified {len(labeled_borderline_items)} borderline phrase(s) with Qwen; pass phrases are included for human approval.",
+            "message": f"Classified {len(labeled_candidates)} phrase(s) with Qwen: {borderline_count} borderline and {pass_count} model-pass candidate(s).",
         }
     except Exception as exc:
+        labeled_candidates = review_items
         labeled_items = review_items
         classifier_status = {
             "agent": "ClassifierAgent",
@@ -1728,25 +1749,66 @@ def run_agentic_review_cycle(
             "message": f"Qwen labeling failed: {exc}. Human can still type final labels manually.",
         }
 
+    display_borderline_count = sum(1 for item in labeled_items if item.get("review_type") == "borderline")
+    pass_qwen_fail_count = sum(
+        1
+        for item in labeled_items
+        if item.get("review_type") == "pass"
+        and _review_label_to_model_label(item.get("llm_label")) == "Non-Compliant"
+    )
+
+    if not labeled_items:
+        summary_lines = [
+            *_summarize_rule_evidence(before_payloads),
+            f"Qwen reviewed {pass_count} model-pass phrase(s) and did not mark any as Fail.",
+            "No retraining is recommended from this run because there are no phrases requiring human approval.",
+        ]
+        result = {
+            "status": "completed",
+            "message": "No phrases require human approval after Qwen review.",
+            "transcript_count": len(before_payloads),
+            "borderline_count": 0,
+            "pass_review_count": 0,
+            "pass_candidate_count": pass_count,
+            "before_payloads": before_payloads,
+            "review_items": [],
+            "stage_status": [
+                *stage_status,
+                classifier_status,
+                {
+                    "agent": "SupervisorAgent",
+                    "status": "completed",
+                    "message": "No borderline phrases or model-pass/Qwen-fail phrases require approval.",
+                },
+            ],
+            "supervisor_summary": "\n".join(summary_lines),
+            "recommendation": "No training update is needed for this upload.",
+        }
+        _json_save("data/results/demo/agentic/app_loop_review.json", result)
+        return result
+
     prepared_message = (
         f"SupervisorAgent prepared {len(labeled_items)} phrase(s) for human review: "
-        f"{pass_count} pass phrase(s) and {borderline_count} borderline phrase(s)."
+        f"{display_borderline_count} borderline phrase(s) and "
+        f"{pass_qwen_fail_count} model-pass/Qwen-fail phrase(s)."
     )
     summary_lines = [*_summarize_rule_evidence(before_payloads)]
     result = {
         "status": "awaiting_human_approval",
-        "message": "Pass and borderline phrases are ready for human approval.",
+        "message": "Review-ready phrases are ready for human approval.",
         "transcript_count": len(before_payloads),
-        "borderline_count": borderline_count,
-        "pass_review_count": pass_count,
+        "borderline_count": display_borderline_count,
+        "pass_review_count": pass_qwen_fail_count,
+        "pass_candidate_count": pass_count,
         "before_payloads": before_payloads,
         "review_items": labeled_items,
+        "review_candidates": labeled_candidates,
         "stage_status": [
             *stage_status,
             {
                 "agent": "SupervisorAgent",
                 "status": "needs_human_approval",
-                "message": f"Identified {pass_count} pass phrase(s) and {borderline_count} borderline phrase(s).",
+                "message": f"Identified {display_borderline_count} borderline phrase(s) and {pass_qwen_fail_count} model-pass/Qwen-fail phrase(s).",
             },
             classifier_status,
         ],

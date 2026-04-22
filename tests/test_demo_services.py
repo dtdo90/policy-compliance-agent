@@ -202,7 +202,34 @@ def test_agentic_review_summary_lists_rules_before_borderline(monkeypatch):
     assert "Evidence reviewed:" not in summary
 
 
-def test_agentic_review_includes_pass_and_borderline_phrases(monkeypatch):
+def test_filter_review_items_for_human_approval_keeps_borderline_and_pass_qwen_fail():
+    items = [
+        {
+            "review_type": "borderline",
+            "model_label": "Non-Compliant",
+            "llm_label": "Compliant",
+            "verification_score": 0.42,
+        },
+        {
+            "review_type": "pass",
+            "model_label": "Compliant",
+            "llm_label": "Non-Compliant",
+            "verification_score": 0.91,
+        },
+        {
+            "review_type": "pass",
+            "model_label": "Compliant",
+            "llm_label": "Compliant",
+            "verification_score": 0.88,
+        },
+    ]
+
+    kept = demo_services.filter_review_items_for_human_approval(items)
+
+    assert [item["review_type"] for item in kept] == ["borderline", "pass"]
+
+
+def test_agentic_review_labels_pass_and_borderline_phrases(monkeypatch):
     class FakeAnalyzer:
         def analyze_transcript(self, transcript, transcript_id):
             return {
@@ -235,7 +262,66 @@ def test_agentic_review_includes_pass_and_borderline_phrases(monkeypatch):
                 }
             }
 
+    seen = []
+
     def fake_label(items, **kwargs):
+        seen.extend(dict(item) for item in items)
+        labeled = []
+        for item in items:
+            row = dict(item)
+            row["llm_label"] = "Non-Compliant" if row.get("review_type") == "pass" else "Compliant"
+            labeled.append(row)
+        return labeled
+
+    monkeypatch.setattr(demo_services, "_load_demo_analyzer", lambda config: FakeAnalyzer())
+    monkeypatch.setattr(demo_services, "label_review_items_with_ollama", fake_label)
+
+    result = demo_services.run_agentic_review_cycle(
+        [{"transcript_id": "tx1", "transcript": "Agent: There will be a fee."}],
+        config=demo_services.load_demo_config(),
+    )
+
+    assert [item["review_type"] for item in seen] == ["pass", "borderline"]
+    assert result["pass_candidate_count"] == 1
+    assert result["pass_review_count"] == 1
+    assert result["borderline_count"] == 1
+    assert [item["review_type"] for item in result["review_items"]] == ["pass", "borderline"]
+    assert result["review_items"][0]["llm_label"] == "Non-Compliant"
+    assert result["review_items"][1]["llm_label"] == "Compliant"
+    assert "1 model-pass/Qwen-fail" in result["recommendation"]
+    assert "Anchor 1:" in result["supervisor_summary"]
+    assert "Anchor 2:" in result["supervisor_summary"]
+
+
+def test_agentic_review_hides_pass_phrase_when_qwen_agrees(monkeypatch):
+    class FakeAnalyzer:
+        def analyze_transcript(self, transcript, transcript_id):
+            return {
+                "102": {
+                    "status": "PASS",
+                    "evidence": {
+                        "claims": {
+                            "single": [],
+                            "mandatory": [
+                                {
+                                    "claim_type": "mandatory",
+                                    "claim_idx": 0,
+                                    "passed": True,
+                                    "anchor": "Before I confirm this booking change, there is a change fee that will apply.",
+                                    "match_text": "There will be a fee to make the change.",
+                                    "verification_score": 0.92,
+                                }
+                            ],
+                            "standard": [],
+                        }
+                    },
+                }
+            }
+
+    seen = []
+
+    def fake_label(items, **kwargs):
+        seen.extend(dict(item) for item in items)
         labeled = [dict(item) for item in items]
         for item in labeled:
             item["llm_label"] = "Compliant"
@@ -249,13 +335,12 @@ def test_agentic_review_includes_pass_and_borderline_phrases(monkeypatch):
         config=demo_services.load_demo_config(),
     )
 
-    assert result["pass_review_count"] == 1
-    assert result["borderline_count"] == 1
-    assert [item["review_type"] for item in result["review_items"]] == ["pass", "borderline"]
-    assert result["review_items"][0].get("llm_label", "") == ""
-    assert result["review_items"][1]["llm_label"] == "Compliant"
-    assert "Anchor 1:" in result["supervisor_summary"]
-    assert "Anchor 2:" in result["supervisor_summary"]
+    assert [item["review_type"] for item in seen] == ["pass"]
+    assert result["status"] == "completed"
+    assert result["pass_candidate_count"] == 1
+    assert result["pass_review_count"] == 0
+    assert result["review_items"] == []
+    assert "did not mark any as Fail" in result["supervisor_summary"]
 
 
 def test_label_borderline_items_with_ollama_uses_client():

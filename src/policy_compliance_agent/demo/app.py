@@ -23,6 +23,7 @@ from .services import (
     approve_demo_examples,
     complete_agentic_reinference_cycle,
     diagnose_score_regressions,
+    filter_review_items_for_human_approval,
     label_borderline_items_with_ollama,
     load_demo_config,
     load_demo_samples,
@@ -1082,7 +1083,7 @@ def _format_app_agentic_summary(summary: dict[str, Any]) -> str:
     if "borderline_count" in summary:
         lines.append(f"- Borderline phrases: `{int(summary.get('borderline_count', 0) or 0)}`")
     if "pass_review_count" in summary:
-        lines.append(f"- Pass phrases for review: `{int(summary.get('pass_review_count', 0) or 0)}`")
+        lines.append(f"- Model-pass/Qwen-fail phrases: `{int(summary.get('pass_review_count', 0) or 0)}`")
 
     stage_status = summary.get("stage_status", [])
     if isinstance(stage_status, list) and stage_status:
@@ -1424,7 +1425,8 @@ def _chat_context(payload: dict[str, Any], review_items: list[dict[str, Any]]) -
     guidance = (
         "This is a policy-review demo for two travel-agency/helpdesk-style controls. "
         "The inference payload contains rule-level pass/fail decisions, scores, anchors, and matched evidence text. "
-        "The review_items list contains the current borderline rows; after Qwen labeling, it also contains qwen/llm labels, confidence, and rationale. "
+        "The review_items list contains the current human-review rows: all borderline phrases plus any model-pass phrase that Qwen labels Fail. "
+        "After Qwen labeling, rows may include qwen/llm labels, confidence, and rationale. "
         "Use only this context when answering, clearly distinguish the model score from Qwen or human review labels, and avoid inventing evidence."
     )
     return {
@@ -1519,6 +1521,7 @@ def build_demo_app(config_path: str | None = None):
         dict[str, Any],
         str,
         list[dict[str, Any]],
+        list[dict[str, Any]],
         str,
         str,
         str,
@@ -1526,15 +1529,22 @@ def build_demo_app(config_path: str | None = None):
         list[dict[str, str]],
     ]:
         payload = run_demo_inference(transcript, config=config)
-        review_items = payload.get("borderline_items", [])
-        dataframe = _borderline_dataframe(review_items)
-        summary = f"Found {len(payload.get('borderline_items', []))} borderline phrase(s) in the `[0.30, 0.70)` band."
+        candidate_items = payload.get("review_items", payload.get("borderline_items", []))
+        display_items = filter_review_items_for_human_approval(candidate_items)
+        dataframe = _borderline_dataframe(display_items)
+        borderline_count = sum(1 for item in candidate_items if item.get("review_type") == "borderline")
+        pass_count = sum(1 for item in candidate_items if item.get("review_type") == "pass")
+        summary = (
+            f"Found {borderline_count} borderline phrase(s) and {pass_count} model-pass phrase(s) for Qwen review. "
+            "The table shows all borderline phrases; after Qwen labeling it will also show any model-pass phrase that Qwen marks Fail."
+        )
         return (
             _format_results(payload),
             dataframe,
             payload,
             summary,
-            review_items,
+            display_items,
+            candidate_items,
             DEFAULT_LLM_PANEL_MESSAGE,
             DEFAULT_LLM_PANEL_MESSAGE,
             "",
@@ -1542,44 +1552,56 @@ def build_demo_app(config_path: str | None = None):
             [],
         )
 
-    def label_borderline_ui(items: list[dict[str, Any]] | None):
-        items = items if isinstance(items, list) else []
-        if not items:
+    def label_borderline_ui(candidate_items: list[dict[str, Any]] | None):
+        candidate_items = candidate_items if isinstance(candidate_items, list) else []
+        display_items = filter_review_items_for_human_approval(candidate_items)
+        if not candidate_items:
             yield (
                 _borderline_dataframe([]),
                 [],
+                [],
                 DEFAULT_LLM_PANEL_MESSAGE,
                 DEFAULT_LLM_PANEL_MESSAGE,
-                "No borderline phrases to label.",
+                "No phrases to label.",
             )
             return
 
         yield (
-            _borderline_dataframe(items),
-            items,
+            _borderline_dataframe(display_items),
+            display_items,
+            candidate_items,
             DEFAULT_LLM_PANEL_MESSAGE,
             DEFAULT_LLM_PANEL_MESSAGE,
-            f"Labeling {len(items)} borderline phrase(s) with Qwen3-4B. This can take a few seconds the first time Ollama loads the model...",
+            f"Labeling {len(candidate_items)} review candidate(s) with Qwen3-4B. This can take a few seconds the first time Ollama loads the model...",
         )
         try:
-            labeled = label_borderline_items_with_ollama(items, config=config)
+            labeled_candidates = label_borderline_items_with_ollama(candidate_items, config=config)
         except Exception as exc:
             error_message = f"### LLM Review Suggestions\nLLM request failed: {exc}"
             yield (
-                _borderline_dataframe(items),
-                items,
+                _borderline_dataframe(display_items),
+                display_items,
+                candidate_items,
                 error_message,
                 error_message,
                 f"LLM request failed: {exc}",
             )
             return
-        summary = _format_llm_review_summary(labeled)
+        labeled_display_items = filter_review_items_for_human_approval(labeled_candidates)
+        summary = _format_llm_review_summary(labeled_display_items)
+        borderline_count = sum(1 for item in labeled_display_items if item.get("review_type") == "borderline")
+        pass_qwen_fail_count = sum(
+            1
+            for item in labeled_display_items
+            if item.get("review_type") == "pass" and _label_to_display(item.get("llm_label")) == "Fail"
+        )
         yield (
-            _borderline_dataframe(labeled),
-            labeled,
+            _borderline_dataframe(labeled_display_items),
+            labeled_display_items,
+            labeled_candidates,
             summary,
             DEFAULT_LLM_PANEL_MESSAGE,
-            f"Labeled {len(labeled)} borderline phrase(s) with Ollama.",
+            f"Labeled {len(labeled_candidates)} phrase(s) with Ollama. Showing {borderline_count} borderline phrase(s) and {pass_qwen_fail_count} model-pass/Qwen-fail phrase(s).",
         )
 
     def approve_ui(dataframe: pd.DataFrame, review_items: list[dict[str, Any]] | None) -> tuple[str, Any]:
@@ -1948,6 +1970,7 @@ def build_demo_app(config_path: str | None = None):
 
         payload_state = gr.State({})
         review_items_state = gr.State([])
+        review_candidate_items_state = gr.State([])
         chat_history_state = gr.State([])
         agentic_summary_state = gr.State({})
         agentic_empty_transcript_state = gr.State("")
@@ -2016,7 +2039,7 @@ def build_demo_app(config_path: str | None = None):
                     row_count=(0, "dynamic"),
                     column_count=(7, "fixed"),
                     interactive=True,
-                    label="Borderline Review Queue",
+                    label="Human Review Queue",
                     elem_id="borderline-review-table",
                     wrap=True,
                     min_width=0,
@@ -2024,7 +2047,7 @@ def build_demo_app(config_path: str | None = None):
                 )
 
                 with gr.Row():
-                    label_btn = gr.Button("Label Borderline Phrases with Qwen3-4B")
+                    label_btn = gr.Button("Label Review Candidates with Qwen3-4B")
                     approve_btn = gr.Button("Save Selected Examples")
                     retrain_btn = gr.Button(
                         "Retrain Models",
@@ -2061,6 +2084,7 @@ def build_demo_app(config_path: str | None = None):
                         payload_state,
                         borderline_summary,
                         review_items_state,
+                        review_candidate_items_state,
                         llm_review_results,
                         llm_review_summary,
                         approval_status,
@@ -2070,10 +2094,11 @@ def build_demo_app(config_path: str | None = None):
                 )
                 label_btn.click(
                     label_borderline_ui,
-                    inputs=[review_items_state],
+                    inputs=[review_candidate_items_state],
                     outputs=[
                         borderline_table,
                         review_items_state,
+                        review_candidate_items_state,
                         llm_review_results,
                         llm_review_summary,
                         approval_status,
