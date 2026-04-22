@@ -439,6 +439,51 @@ def test_label_borderline_items_with_ollama_can_override_to_compliant_for_clear_
     assert "fee applies for making the booking change" in labeled[0]["llm_rationale"]
 
 
+def test_label_borderline_items_with_ollama_overrides_negated_anchor_to_non_compliant():
+    class CompliantClient:
+        def chat(self, *, system_prompt, user_prompt, temperature=0.0, json_mode=False, num_predict=None):
+            return json.dumps(
+                {
+                    "label": "Compliant",
+                    "confidence": 0.95,
+                    "rationale": "Too lenient.",
+                }
+            )
+
+    items = [
+        {
+            "disclaimer_id": "101",
+            "claim_type": "single",
+            "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+            "text": "Before I reset or unlock your account, I do not need to verify your identity first.",
+            "verification_score": 0.99,
+        },
+        {
+            "disclaimer_id": "102",
+            "claim_type": "mandatory",
+            "anchor": "Before I confirm this booking change, there is a change fee that will apply.",
+            "text": "Before I confirm this booking change, there is no change fee that will apply.",
+            "verification_score": 0.99,
+        },
+        {
+            "disclaimer_id": "102",
+            "claim_type": "mandatory",
+            "anchor": "There is also a fare difference on the new itinerary, so you will either pay the extra amount or receive the balance as travel credit.",
+            "text": "There is also no fare difference on the new itinerary, so you will not pay any extra amount and there will not be any travel credit.",
+            "verification_score": 0.99,
+        },
+    ]
+
+    labeled = demo_services.label_borderline_items_with_ollama(
+        items,
+        config=demo_services.load_demo_config(),
+        client=CompliantClient(),
+    )
+
+    assert [item["llm_label"] for item in labeled] == ["Non-Compliant", "Non-Compliant", "Non-Compliant"]
+    assert all("resembles" in item["llm_rationale"] for item in labeled)
+
+
 def test_label_borderline_items_with_ollama_falls_back_when_qwen_returns_reasoning():
     class ReasoningClient:
         def chat(self, *, system_prompt, user_prompt, temperature=0.0, json_mode=False, num_predict=None):

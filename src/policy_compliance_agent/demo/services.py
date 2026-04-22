@@ -664,18 +664,21 @@ def _claim_review_hint(item: dict[str, Any]) -> str:
     if "change fee" in anchor:
         return (
             "Treat this anchor as satisfied when the phrase clearly says a fee or charge applies for changing the booking. "
-            "Do not require the exact wording about confirmation timing."
+            "Label Non-Compliant when the phrase says no fee applies, the fee is waived, or the cost will only be clarified later. "
+            "Do not require exact confirmation-timing wording unless the phrase explicitly says the booking was already confirmed."
         )
     if "fare difference" in anchor or "travel credit" in anchor:
         return (
             "Treat this anchor as satisfied when the phrase clearly says the new itinerary changes the fare, "
             "for example paying extra, receiving credit, or the new option being higher or lower priced. "
-            "Do not require the exact wording about confirmation timing."
+            "Label Non-Compliant when it says there is no fare difference, no extra payment or credit impact, "
+            "or that the payment/credit outcome will be decided later."
         )
     if "verify your identity first" in anchor or "reset or unlock" in anchor:
         return (
             "Treat this anchor as satisfied when the phrase clearly says verification or confirming details must happen "
-            "before reset, unlock, or account access changes."
+            "before reset, unlock, or account access changes. Label Non-Compliant when verification is optional, "
+            "not required, or delayed until after the reset/unlock."
         )
     return "Judge only whether the phrase conveys the target anchor meaning in natural language."
 
@@ -685,6 +688,23 @@ def _semantic_anchor_override(item: dict[str, Any]) -> tuple[str, str] | None:
     text = " ".join(str(item.get("text", "")).strip().lower().split())
 
     if "change fee" in anchor:
+        negative_fee_terms = (
+            "no change fee",
+            "no fee",
+            "no change charge",
+            "fee does not apply",
+            "fee that will not apply",
+            "not be a fee",
+            "fee is waived",
+            "without a fee",
+            "already confirmed",
+            "after ticketing",
+        )
+        if any(term in text for term in negative_fee_terms):
+            return (
+                "Non-Compliant",
+                "The phrase resembles the change-fee anchor but negates the fee, waives it, or discloses it after confirmation.",
+            )
         fee_terms = ("change fee", "fee to make the change", "fee for the change", "change charge", "rebooking fee")
         if any(term in text for term in fee_terms) or ("fee" in text and "change" in text):
             return (
@@ -693,6 +713,25 @@ def _semantic_anchor_override(item: dict[str, Any]) -> tuple[str, str] | None:
             )
 
     if "fare difference" in anchor or "travel credit" in anchor:
+        negative_pricing_terms = (
+            "no fare difference",
+            "no extra amount",
+            "not pay any extra",
+            "not need to pay",
+            "will not pay",
+            "no travel credit",
+            "not be any travel credit",
+            "will not be any travel credit",
+            "decide later whether",
+            "settled afterward",
+            "cost details can be settled afterward",
+            "not sure yet",
+        )
+        if any(term in text for term in negative_pricing_terms):
+            return (
+                "Non-Compliant",
+                "The phrase resembles the fare-difference anchor but negates or postpones the payment/credit impact.",
+            )
         pricing_terms = ("higher", "lower", "more expensive", "cheaper", "extra amount", "travel credit", "credit", "balance")
         if any(term in text for term in pricing_terms):
             return (
@@ -701,6 +740,24 @@ def _semantic_anchor_override(item: dict[str, Any]) -> tuple[str, str] | None:
             )
 
     if "verify your identity first" in anchor or "reset or unlock" in anchor:
+        negative_verification_terms = (
+            "do not need to verify",
+            "don't need to verify",
+            "not need to verify",
+            "verification is optional",
+            "verify your identity afterward",
+            "verify your identity after",
+            "after i reset or unlock",
+            "after reset",
+            "after unlock",
+            "already unlocked",
+            "unlock your account first",
+        )
+        if any(term in text for term in negative_verification_terms):
+            return (
+                "Non-Compliant",
+                "The phrase resembles the verification anchor but makes verification optional or places it after the account change.",
+            )
         if (
             any(term in text for term in ("verify", "identity", "confirm a couple of details", "confirm some information"))
             and any(term in text for term in ("before", "first"))
@@ -732,6 +789,7 @@ def label_review_items_with_ollama(
         "Treat the target anchor semantically, not as an exact quote.\n"
         "Equivalent paraphrases count as Compliant when the core meaning is clearly present.\n"
         "Do not over-penalize missing framing words such as 'before I confirm' or 'before I reset' if the core disclosure or requirement is conveyed.\n"
+        "However, label Non-Compliant when the phrase explicitly negates the anchor, makes the requirement optional, places verification/disclosure after the action, or says the outcome will be decided later.\n"
         "Candidates may be borderline or model-pass phrases; keep confidence calibrated and avoid extreme confidence unless the match is very clear.\n"
         "Do not include chain-of-thought, markdown, or explanatory prose outside JSON.\n"
         "Return exactly one valid JSON object with keys: label, confidence, rationale.\n"
