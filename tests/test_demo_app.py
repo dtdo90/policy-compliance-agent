@@ -145,7 +145,7 @@ def test_merge_review_items_uses_edited_model_label_when_final_label_blank():
     assert merged[0]["final_label"] == "Non-Compliant"
 
 
-def test_agentic_review_dataframe_hides_transcript_and_previews_anchor_text():
+def test_agentic_review_dataframe_hides_transcript_and_shows_full_anchor_text():
     dataframe = demo_app._agentic_review_dataframe(
         [
             {
@@ -161,11 +161,102 @@ def test_agentic_review_dataframe_hides_transcript_and_previews_anchor_text():
 
     assert list(dataframe.columns) == ["add", "rule", "score", "anchor", "text", "model", "qwen", "human"]
     row = dataframe.to_dict(orient="records")[0]
-    assert row["anchor"] == "Before I confirm this booking change, there is ..."
-    assert row["text"] == "There will be a fee to make the ..."
+    assert row["anchor"] == "Before I confirm this booking change, there is a change fee that will apply."
+    assert row["text"] == "There will be a fee to make the change and the new flight is higher."
     assert row["model"] == "Pass"
     assert row["qwen"] == "Pass"
     assert "transcript" not in row
+
+
+def test_refresh_investigator_generated_queue_replaces_stale_generated_rows():
+    review_items = [
+        {
+            "transcript_id": "tx1",
+            "disclaimer_id": "101",
+            "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+            "text": "now. After I unlock your account, I will verify your identity for our records.",
+            "final_label": "Non-Compliant",
+        },
+        {
+            "transcript_id": "investigator_generated_101_1",
+            "disclaimer_id": "101",
+            "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+            "text": "old generated sample",
+            "review_type": "generated_synthetic",
+            "final_label": "Non-Compliant",
+        },
+    ]
+    generated_items = [
+        {
+            "transcript_id": "investigator_generated_101_1",
+            "disclaimer_id": "101",
+            "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+            "text": "new generated sample a",
+            "review_type": "generated_synthetic",
+            "final_label": "Non-Compliant",
+        },
+        {
+            "transcript_id": "investigator_generated_101_2",
+            "disclaimer_id": "101",
+            "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+            "text": "new generated sample b",
+            "review_type": "generated_synthetic",
+            "final_label": "Non-Compliant",
+        },
+    ]
+
+    refreshed = demo_app._refresh_investigator_generated_queue(review_items, generated_items)
+
+    assert [item["text"] for item in refreshed] == [
+        "now. After I unlock your account, I will verify your identity for our records.",
+        "new generated sample a",
+        "new generated sample b",
+    ]
+
+
+def test_agentic_review_dataframe_blanks_generated_score_and_model():
+    dataframe = demo_app._agentic_review_dataframe(
+        [
+            {
+                "disclaimer_id": "101",
+                "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+                "text": "I will unlock your account first, then verify identity afterward.",
+                "verification_score": 0.0,
+                "review_type": "generated_synthetic",
+                "llm_label": "Non-Compliant",
+                "final_label": "Non-Compliant",
+            }
+        ]
+    )
+
+    row = dataframe.to_dict(orient="records")[0]
+    assert row["score"] == ""
+    assert row["model"] == ""
+    assert row["qwen"] == "Fail"
+    assert row["human"] == "Fail"
+
+
+def test_format_agentic_comparison_markdown_shows_case_outcomes():
+    text = demo_app._format_agentic_comparison_markdown(
+        [
+            {
+                "disclaimer_id": "101",
+                "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+                "text": "now. After I unlock your account, I will verify your identity for our records.",
+                "verification_score": 0.9986,
+                "before_score": 0.9986,
+                "after_score": 0.4817,
+                "final_label": "Non-Compliant",
+                "outcome": "improved",
+            }
+        ]
+    )
+
+    assert "Case 1: Rule 101" in text
+    assert "Status:** `Success`" in text
+    assert "model `Pass` -> human `Fail` -> model `Fail` after retrain" in text
+    assert "`0.9986` -> `0.4817`" in text
+    assert "| Rule |" not in text
 
 
 def test_format_results_uses_short_demo_names_and_per_anchor_evidence():
@@ -275,25 +366,49 @@ def test_format_agentic_summary_includes_bootstrap_and_holdout_metrics():
     assert "`yes`" in text
 
 
-def test_format_app_agentic_summary_preserves_transcript_breaks():
+def test_format_app_agentic_summary_renders_supervisor_table_with_collapsible_details():
     text = demo_app._format_app_agentic_summary(
         {
             "status": "awaiting_human_approval",
             "message": "Review ready.",
-            "supervisor_summary": (
-                "Transcript 1: sample_helpdesk_bad\n"
-                "Rule 101: FAIL\n"
-                "  Score: 0.102\n"
-                "\n"
-                "Transcript 2: sample_helpdesk_good\n"
-                "Rule 101: PASS\n"
-                "  Score: 1.000"
-            ),
+            "supervisor_summary": "Transcript 1: sample_helpdesk_bad",
+            "before_payloads": [
+                {
+                    "transcript_id": "sample_helpdesk_bad",
+                    "transcript": "Agent: I will unlock first.",
+                    "results": {
+                        "101": {
+                            "status": "FAIL",
+                            "evidence": {
+                                "verification_score": 0.102,
+                                "claims": {
+                                    "single": [
+                                        {
+                                            "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+                                            "match_text": "I will unlock first.",
+                                            "verification_score": 0.102,
+                                        }
+                                    ]
+                                },
+                            },
+                        },
+                        "102": {
+                            "status": "PASS",
+                            "evidence": {"verification_score": 0.901, "claims": {"mandatory": []}},
+                        },
+                    },
+                }
+            ],
         }
     )
 
-    assert "**Transcript 1: sample_helpdesk_bad**" in text
-    assert "\n\n**Transcript 2: sample_helpdesk_good**" in text
+    assert "<table class='supervisor-table'>" in text
+    assert "<th>Transcript</th><th>Rule 101</th><th>Rule 102</th><th>PASS</th>" in text
+    assert "<summary>Transcript 1: sample_helpdesk_bad</summary>" in text
+    assert "<td><code>0.102</code>" in text
+    assert "<td><code>0.901</code>" in text
+    assert "<td>102</td>" in text
+    assert "Show transcript text" in text
 
 
 def test_format_regression_investigation_report_summarizes_root_cause():
@@ -316,11 +431,8 @@ def test_format_regression_investigation_report_summarizes_root_cause():
                         "before_score": 0.754,
                         "after_score": 0.7233,
                         "target_direction": "higher",
-                        "cause_tags": ["thin_coverage"],
-                        "same_label_count": 1,
-                        "opposite_label_count": 3,
-                        "max_same_label_similarity": 0.68,
-                        "solution_steps": ["Generate two nearby pass variants for this anchor."],
+                        "investigator_outcome": "under_represented_pattern",
+                        "recommendation": "Generate two nearby pass variants for this anchor.",
                     }
                 ]
             },
@@ -330,8 +442,45 @@ def test_format_regression_investigation_report_summarizes_root_cause():
     assert "InvestigatorAgent Diagnosis" in text
     assert "0.7540" in text
     assert "0.7233" in text
-    assert "thin_coverage" in text
+    assert "under_represented_pattern" in text
     assert "Generate two nearby pass variants" in text
+    assert "Dataset signal" not in text
+    assert "Likely cause" not in text
+
+
+def test_format_review_case_investigation_report_summarizes_dataset_coverage():
+    text = demo_app._format_review_case_investigation_report(
+        {
+            "analyses": [
+                {
+                    "disclaimer_id": "101",
+                    "label_change": "model Pass -> human Fail",
+                    "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+                    "phrase": "After I reset or unlock your account, I need to verify your identity first.",
+                    "cause_tags": ["missing_coverage"],
+                    "same_label_count": 0,
+                    "opposite_label_count": 4,
+                    "max_same_label_similarity": 0.11,
+                    "investigator_rationale": "This internal rationale should stay out of the visible report.",
+                    "solution_steps": ["Ask a DataGeneratorAgent to create 2-3 additional synthetic phrases for this anchor and human label."],
+                    "generated_samples": [
+                        "I unlock first, then verify identity afterward.",
+                        "Access is restored before identity is checked.",
+                    ],
+                }
+            ]
+        }
+    )
+
+    assert "model Pass -> human Fail" in text
+    assert "missing_coverage" in text
+    assert "Synthetic coverage" not in text
+    assert "same-label" not in text
+    assert "DataGeneratorAgent" in text
+    assert "Likely cause" not in text
+    assert "LLM rationale" not in text
+    assert "Generated samples appended to the approval queue" not in text
+    assert "I unlock first" in text
 
 
 def test_reset_base_models_button_wires_existing_service(monkeypatch):
@@ -340,6 +489,7 @@ def test_reset_base_models_button_wires_existing_service(monkeypatch):
     buttons = [component for component in app.blocks.values() if isinstance(component, gr.Button)]
 
     assert any(getattr(button, "value", None) == "Reset to Base Models" for button in buttons)
+    assert any(getattr(button, "value", None) == "Investigate Failed Cases" for button in buttons)
 
 
 def test_materialize_incoming_source_creates_temp_file_for_text():

@@ -1,0 +1,24 @@
+Agent: Welcome to the service desk, this is Priya speaking. How can I help today?
+Customer: Hi Priya, I am locked out of my employee portal and I also need to change a flight booked through the company travel desk.
+Agent: I can help with both requests.
+Customer: Great, the account issue is the urgent one.
+Agent: Before I reset or unlock your account, I need to verify your identity first.
+Customer: Sure.
+Agent: Please confirm your employee ID and the one-time code I just sent to your registered mobile.
+Customer: My employee ID is SG57124 and the code is 441902.
+Agent: Thank you, that matches our records, so your identity is verified.
+Customer: Perfect.
+Agent: I have now unlocked your account and sent a temporary password to your work email.
+Customer: Thanks. Can we handle the flight change now?
+Agent: Yes. I found a seat on the later flight tomorrow evening.
+Customer: That option works for me.
+Agent: Before I confirm this booking change, there is a change fee that will apply.
+Customer: Okay, how much is the fee?
+Agent: The airline change fee is sixty dollars for this exchange.
+Customer: Understood.
+Agent: There is also a fare difference on the new itinerary, so you will either pay the extra amount or receive the balance as travel credit.
+Customer: What does that look like for this flight?
+Agent: In this case the new itinerary is forty dollars higher, so the total additional amount is one hundred dollars before I confirm the change.
+Customer: That is fine, please go ahead.
+Agent: Thanks, I am confirming the booking change now and I will email the updated itinerary right away.
+Customer: Excellent, thank you for your help.

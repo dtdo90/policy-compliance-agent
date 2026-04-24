@@ -14,6 +14,7 @@ htmlcov/
 
 # Local model/checkpoint artifacts are generated from the synthetic dataset.
 models/
+reference/
 data/results/checkpoints/
 data/results/demo/checkpoints/
 data/results/demo/agentic/

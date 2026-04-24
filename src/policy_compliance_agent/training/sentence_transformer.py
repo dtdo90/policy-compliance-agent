@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import platform
 import random
 import shutil
 from pathlib import Path
@@ -18,6 +19,10 @@ def generate_triplet_rows(
     dataset_rows: list[dict[str, Any]],
     seed: int,
     disclosures: dict[str, Any] | None = None,
+    *,
+    use_extra_sampling: bool = True,
+    extra_hard_negatives_per_positive: int = 2,
+    topic_negatives_per_positive: int = 2,
 ) -> dict[str, list[str]]:
     random.seed(seed)
 
@@ -48,7 +53,12 @@ def generate_triplet_rows(
 
         key = (disclaimer_id, anchor_text)
         data_pool.setdefault(key, {"anchor": anchor_text, "compliant": [], "non-compliant": []})
-        data_pool[key][label_type].append(dialogue)
+        try:
+            sample_weight = int(entry.get("sample_weight", 1) or 1)
+        except (TypeError, ValueError):
+            sample_weight = 1
+        sample_weight = max(1, sample_weight)
+        data_pool[key][label_type].extend([dialogue] * sample_weight)
 
     anchors: list[str] = []
     positives: list[str] = []
@@ -77,17 +87,19 @@ def generate_triplet_rows(
             positives.append(positive_text)
             negatives.append(negative_text)
 
-        for positive_text in compliant_rows:
-            banned = paired_negative_by_positive.get(positive_text)
-            pool = [negative for negative in hard_negatives if negative != banned] or hard_negatives
-            for negative_text in random.sample(pool, min(2, len(pool))):
-                anchors.append(anchor_text)
-                positives.append(positive_text)
-                negatives.append(negative_text)
-
-        if other_keys:
+        if use_extra_sampling and extra_hard_negatives_per_positive > 0:
             for positive_text in compliant_rows:
-                selected_other = random.sample(other_keys, min(2, len(other_keys)))
+                banned = paired_negative_by_positive.get(positive_text)
+                pool = [negative for negative in hard_negatives if negative != banned] or hard_negatives
+                sample_size = min(extra_hard_negatives_per_positive, len(pool))
+                for negative_text in random.sample(pool, sample_size):
+                    anchors.append(anchor_text)
+                    positives.append(positive_text)
+                    negatives.append(negative_text)
+
+        if use_extra_sampling and topic_negatives_per_positive > 0 and other_keys:
+            for positive_text in compliant_rows:
+                selected_other = random.sample(other_keys, min(topic_negatives_per_positive, len(other_keys)))
                 for other_key in selected_other:
                     other_positive_rows = data_pool[other_key]["compliant"]
                     if not other_positive_rows:
@@ -136,30 +148,34 @@ def train_sentence_transformer_with_overrides(
     disclosures_path = resolve_project_path(data_settings["disclosures_file"])
     disclosures = json.loads(disclosures_path.read_text(encoding="utf-8"))
     seed = int(training_settings.get("seed", 42))
-    triplets = generate_triplet_rows(dataset_rows, seed=seed, disclosures=disclosures)
+    triplets = generate_triplet_rows(
+        dataset_rows,
+        seed=seed,
+        disclosures=disclosures,
+        use_extra_sampling=bool(training_settings.get("sentence_transformer_use_extra_sampling", True)),
+        extra_hard_negatives_per_positive=int(training_settings.get("sentence_transformer_extra_hard_negatives", 2)),
+        topic_negatives_per_positive=int(training_settings.get("sentence_transformer_topic_negatives", 2)),
+    )
     if not triplets["anchor"]:
         raise ValueError("No triplets were produced from the configured dataset.")
 
     dataset = Dataset.from_dict(triplets)
-    split_dataset = dataset.train_test_split(test_size=0.2, seed=seed)
-    train_dataset = split_dataset["train"]
-    eval_dataset = split_dataset["test"]
-
     base_model = base_model_name_or_path or model_settings.get("sentence_transformer_base", DEFAULT_SENTENCE_TRANSFORMER_BASE)
-    eval_output_dir = resolve_project_path(monitor_output_dir or "data/results/checkpoints/st_eval")
     final_output_dir = resolve_project_path(output_dir or model_settings["sentence_transformer_output_dir"])
-    eval_output_dir.mkdir(parents=True, exist_ok=True)
     final_output_dir.mkdir(parents=True, exist_ok=True)
 
     batch_size = int(training_settings.get("sentence_transformer_batch_size", 32))
     eval_batch_size = int(training_settings.get("sentence_transformer_eval_batch_size", 64))
     learning_rate = float(training_settings.get("learning_rate", 2e-5))
-    num_epochs = int(training_settings.get("num_epochs", 1))
+    num_epochs = int(training_settings.get("sentence_transformer_num_epochs", training_settings.get("num_epochs", 1)))
     logging_steps = int(training_settings.get("logging_steps", 50))
     dataloader_workers = int(training_settings.get("dataloader_workers", 4))
     triplet_margin = float(training_settings.get("triplet_margin", 0.5))
     force_cpu = bool(training_settings.get("force_cpu", False))
     use_cuda = torch.cuda.is_available() and not force_cpu
+    if platform.system() == "Darwin" and dataloader_workers > 0:
+        print("macOS detected: forcing sentence-transformer dataloader workers to 0 to avoid torch shared-memory startup errors.")
+        dataloader_workers = 0
 
     def run_training_step(step_name: str, train_set: Dataset, eval_set: Dataset | None, output_dir: Path) -> None:
         print(f"=== {step_name} ===")
@@ -214,8 +230,7 @@ def train_sentence_transformer_with_overrides(
         trainer.save_model(str(output_dir))
         _cleanup_checkpoints(output_dir)
 
-    run_training_step("Validation Run", train_dataset, eval_dataset, eval_output_dir)
-    run_training_step("Full Production Run", dataset, None, final_output_dir)
+    run_training_step("Full Training", dataset, None, final_output_dir)
     return final_output_dir
 
 

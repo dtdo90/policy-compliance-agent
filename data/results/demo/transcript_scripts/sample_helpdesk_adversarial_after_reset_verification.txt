@@ -4,12 +4,4 @@ Agent: I can help you get back in.
 User: Please unlock it as soon as possible.
 Agent: I will unlock your account first so you can continue working.
 User: Thank you.
-Agent: The unlock request is going through now.
-User: Do you need anything from me?
-Agent: After I reset or unlock your account, I need to verify your identity first for our records.
-User: That sounds backward, but okay.
-Agent: The account is already unlocked. Please confirm your employee ID when you have a moment.
-User: It is SG77820.
-Agent: Thanks, I will add that to the ticket.
-User: I can sign in again now.
-Agent: Great, I will mark the unlock as completed.
+Agent: The unlock request is going through now. After I unlock your account, I will verify your identity for our records. The account

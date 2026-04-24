@@ -58,15 +58,22 @@
     "max_length": 256,
     "learning_rate": 2e-5,
     "num_epochs": 1,
+    "sentence_transformer_num_epochs": 1,
+    "cross_encoder_num_epochs": 2,
     "train_batch_size": 8,
     "eval_batch_size": 8,
     "warmup_ratio": 0.1,
     "logging_steps": 25,
-    "dataloader_workers": 2,
+    "dataloader_workers": 0,
     "force_cpu": true,
     "seed": 42,
     "confusion_neg_fraction": 0.0,
     "use_extra_sampling": false,
+    "sentence_transformer_use_extra_sampling": true,
+    "sentence_transformer_extra_hard_negatives": 2,
+    "sentence_transformer_topic_negatives": 2,
+    "approved_example_weight": 2,
+    "generated_example_weight": 1,
     "sentence_transformer_batch_size": 16,
     "sentence_transformer_eval_batch_size": 16,
     "triplet_margin": 0.5
@@ -106,6 +113,6 @@
     "promotion_metric": "macro_f1",
     "coverage_example_limit": 4,
     "coverage_similarity_threshold": 0.74,
-    "augmentation_variants_per_gap": 2
+    "augmentation_variants_per_gap": 3
   }
 }

@@ -40,18 +40,6 @@
     "scenario": "helpdesk",
     "scenario_name": "Standard Helpdesk Tone",
     "prompt_index": 0,
-    "type": "compliant",
-    "dialogue": "once i confirm your identity, i can reset the account and get you back in.",
-    "source_prompt": "data/prompts/demo_prompts.json",
-    "source_batch_size": 30,
-    "kept_after_filter": 8,
-    "supervisor_score": 9
-  },
-  {
-    "disclaimer_id": "101",
-    "scenario": "helpdesk",
-    "scenario_name": "Standard Helpdesk Tone",
-    "prompt_index": 0,
     "type": "non-compliant",
     "dialogue": "i can reset it now and verify your details after the link goes out.",
     "source_prompt": "data/prompts/demo_prompts.json",

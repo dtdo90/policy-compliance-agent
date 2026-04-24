@@ -1063,7 +1063,7 @@ def test_retrain_demo_verifier_promotes_better_model(tmp_path, monkeypatch):
     result = demo_services.retrain_demo_verifier(config=config)
 
     assert result["status"] == "trained"
-    assert result["dataset_policy"] == "original_synthetic_plus_latest_approved_phrases"
+    assert result["dataset_policy"] == "original_synthetic_plus_latest_reviewed_or_generated_rows"
     assert result["promoted"] is True
     assert active_retriever_path.exists()
     assert (active_retriever_path / "config.json").exists()
@@ -1272,6 +1272,399 @@ def test_diagnose_label_changed_cases_recommends_missing_coverage_and_flags_labe
     assert "DataGeneratorAgent" in analysis["solution_steps"][0]
 
 
+class InvestigatorGenerationClient:
+    def __init__(self):
+        self.calls = []
+
+    def chat(self, *, system_prompt, user_prompt, temperature=0.0, json_mode=False, num_predict=None):
+        self.calls.append(
+            {
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+                "temperature": temperature,
+                "json_mode": json_mode,
+                "num_predict": num_predict,
+            }
+        )
+        if len(self.calls) == 1:
+            return json.dumps(
+                {
+                    "outcome": "missing_coverage",
+                    "rationale": "No close examples cover this sequence.",
+                    "generated_samples": [],
+                }
+            )
+        return json.dumps(
+            {
+                "generated_samples": [
+                    "I will unlock your account first, then verify identity afterward for our records.",
+                    "Access is restored now; after that I will confirm your identity for the ticket.",
+                    "I can restore access immediately and verify identity once the account is open.",
+                ]
+            }
+        )
+
+
+def test_investigator_asks_qwen_for_missing_coverage_samples_when_classifier_returns_none(tmp_path):
+    synthetic_path = tmp_path / "synthetic.json"
+    approved_path = tmp_path / "approved.json"
+    synthetic_path.write_text("[]", encoding="utf-8")
+    approved_path.write_text("[]", encoding="utf-8")
+    anchor = "Before I reset or unlock your account, I need to verify your identity first."
+    config = demo_services.load_demo_config(
+        overrides={
+            "data": {"synthetic_dataset_path": str(synthetic_path)},
+            "outputs": {"approved_examples_json_path": str(approved_path)},
+            "agentic": {"coverage_similarity_threshold": 0.74, "augmentation_variants_per_gap": 3},
+        }
+    )
+    client = InvestigatorGenerationClient()
+
+    report = demo_services.investigate_label_changed_cases_with_ollama(
+        [
+            {
+                "transcript_id": "tx1",
+                "disclaimer_id": "101",
+                "anchor": anchor,
+                "text": "now. After I unlock your account, I will verify your identity for our records.",
+                "verification_score": 0.998,
+                "final_label": "Non-Compliant",
+            }
+        ],
+        config=config,
+        client=client,
+    )
+
+    assert len(client.calls) == 2
+    assert report["generated_count"] == 3
+    analysis = report["analyses"][0]
+    assert analysis["generated_sample_source"] == "qwen"
+    assert len(analysis["generated_training_items"]) == 3
+    assert all(item["generation_source"] == "qwen" for item in analysis["generated_training_items"])
+    assert analysis["generated_training_items"][0]["review_type"] == "generated_synthetic"
+
+
+def test_fallback_generated_samples_cover_all_demo_anchor_label_cases():
+    anchors = [
+        "Before I reset or unlock your account, I need to verify your identity first.",
+        "Before I confirm this booking change, there is a change fee that will apply.",
+        "There is also a fare difference on the new itinerary, so you will either pay the extra amount or receive the balance as travel credit.",
+    ]
+    labels = [("Compliant", "Compliant"), ("Non-Compliant", "Non-Compliant")]
+
+    for anchor in anchors:
+        for human_label, expected_label in labels:
+            samples = demo_services._fallback_generated_samples_for_analysis(
+                {
+                    "disclaimer_id": "102" if "booking" in anchor or "itinerary" in anchor else "101",
+                    "anchor": anchor,
+                    "phrase": "original reviewed phrase that should not be copied",
+                    "human_label": human_label,
+                },
+                count=3,
+            )
+
+            assert len(samples) == 3
+            assert len(set(samples)) == 3
+            for sample in samples:
+                override = demo_services._semantic_anchor_override({"anchor": anchor, "text": sample})
+                assert override is not None, (anchor, human_label, sample)
+                assert override[0] == expected_label, (anchor, human_label, sample, override)
+
+
+def test_fallback_generated_samples_match_after_unlock_then_verify_pattern():
+    samples = demo_services._fallback_generated_samples_for_analysis(
+        {
+            "disclaimer_id": "101",
+            "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+            "phrase": "now. After I unlock your account, I will verify your identity for our records. The account",
+            "human_label": "Non-Compliant",
+        },
+        count=3,
+    )
+
+    assert len(samples) == 3
+    assert all("for our records" in sample.lower() or "account" in sample.lower() for sample in samples)
+    assert len(samples) == 3
+    assert any(sample.lower().startswith("after i unlock your account") for sample in samples)
+    assert any(sample.lower().startswith("once i unlock your account") for sample in samples)
+    assert any("after i unlock your account" in sample.lower() and not sample.lower().startswith("after i unlock your account") for sample in samples)
+
+
+def test_rule_101_targeted_fallback_samples_all_survive_human_fail_validation():
+    analysis = {
+        "disclaimer_id": "101",
+        "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+        "phrase": "now. After I unlock your account, I will verify your identity for our records. The account",
+        "human_label": "Non-Compliant",
+    }
+
+    samples = demo_services._fallback_generated_samples_for_analysis(analysis, count=3)
+
+    assert len(samples) == 3
+    assert all(
+        demo_services._generated_sample_matches_human_label(
+            anchor=analysis["anchor"],
+            sample=sample,
+            human_label=analysis["human_label"],
+        )
+        for sample in samples
+    )
+
+
+def test_fallback_generated_samples_match_natural_change_fee_pattern_for_human_pass():
+    samples = demo_services._fallback_generated_samples_for_analysis(
+        {
+            "disclaimer_id": "102",
+            "anchor": "Before I confirm this booking change, there is a change fee that will apply.",
+            "phrase": "There will be a fee to make the change, and the new flight is a bit higher. The airline is",
+            "human_label": "Compliant",
+        },
+        count=3,
+    )
+
+    assert len(samples) == 3
+    assert all("fee" in sample.lower() for sample in samples)
+    assert any("new flight is a bit higher" in sample.lower() for sample in samples)
+    assert any("fee to make the change" in sample.lower() for sample in samples)
+
+
+def test_fallback_generated_samples_respect_human_pass_label_for_change_fee():
+    samples = demo_services._fallback_generated_samples_for_analysis(
+        {
+            "disclaimer_id": "102",
+            "anchor": "Before I confirm this booking change, there is a change fee that will apply.",
+            "phrase": "There will be a fee to make the change, and the new flight is a bit higher.",
+            "human_label": "Compliant",
+        },
+        count=3,
+    )
+
+    assert len(samples) == 3
+    assert all("change fee" in sample.lower() or "fee" in sample.lower() for sample in samples)
+    assert not any("no change fee" in sample.lower() for sample in samples)
+    assert not any("afterward" in sample.lower() or "later" in sample.lower() for sample in samples)
+
+
+class InvestigatorBoundaryClient:
+    def __init__(self):
+        self.calls = []
+
+    def chat(self, *, system_prompt, user_prompt, temperature=0.0, json_mode=False, num_predict=None):
+        self.calls.append({"system_prompt": system_prompt, "user_prompt": user_prompt})
+        return json.dumps(
+            {
+                "outcome": "covered_but_boundary_confusing",
+                "rationale": "The reviewed phrase sits near the learned boundary and needs stronger nearby examples.",
+                "generated_samples": [],
+            }
+        )
+
+
+def test_investigator_generates_fallback_samples_for_boundary_confusing_case(tmp_path):
+    synthetic_path = tmp_path / "synthetic.json"
+    approved_path = tmp_path / "approved.json"
+    synthetic_path.write_text("[]", encoding="utf-8")
+    approved_path.write_text("[]", encoding="utf-8")
+    anchor = "Before I reset or unlock your account, I need to verify your identity first."
+    config = demo_services.load_demo_config(
+        overrides={
+            "data": {"synthetic_dataset_path": str(synthetic_path)},
+            "outputs": {"approved_examples_json_path": str(approved_path)},
+            "agentic": {"coverage_similarity_threshold": 0.74, "augmentation_variants_per_gap": 3},
+        }
+    )
+
+    report = demo_services.investigate_label_changed_cases_with_ollama(
+        [
+            {
+                "transcript_id": "tx1",
+                "disclaimer_id": "101",
+                "anchor": anchor,
+                "text": "now. After I unlock your account, I will verify your identity for our records.",
+                "verification_score": 0.998,
+                "final_label": "Non-Compliant",
+            }
+        ],
+        config=config,
+        client=InvestigatorBoundaryClient(),
+    )
+
+    analysis = report["analyses"][0]
+    assert analysis["investigator_outcome"] == "covered_but_boundary_confusing"
+    assert len(analysis["generated_training_items"]) == 3
+    assert all(item["generation_source"] == "fallback" for item in analysis["generated_training_items"])
+    assert analysis["solution_steps"] == ["Review the generated samples, tick approved rows, then retrain on the augmented dataset."]
+
+
+class InvestigatorWrongSamplesClient:
+    def __init__(self):
+        self.calls = []
+
+    def chat(self, *, system_prompt, user_prompt, temperature=0.0, json_mode=False, num_predict=None):
+        self.calls.append({"system_prompt": system_prompt, "user_prompt": user_prompt})
+        if len(self.calls) == 1:
+            return json.dumps(
+                {
+                    "outcome": "missing_coverage",
+                    "rationale": "Model needs pass examples, but these generated rows are wrong.",
+                    "generated_samples": [
+                        "There is no change fee for this booking change, so I can confirm it now.",
+                        "I have confirmed the change first, and any fee can be reviewed afterward.",
+                        "The booking is changed now; if a change fee appears, we can discuss it later.",
+                    ],
+                }
+            )
+        return json.dumps({"generated_samples": []})
+
+
+def test_investigator_rejects_wrong_label_qwen_samples_and_uses_fallback(tmp_path):
+    synthetic_path = tmp_path / "synthetic.json"
+    approved_path = tmp_path / "approved.json"
+    synthetic_path.write_text("[]", encoding="utf-8")
+    approved_path.write_text("[]", encoding="utf-8")
+    anchor = "Before I confirm this booking change, there is a change fee that will apply."
+    config = demo_services.load_demo_config(
+        overrides={
+            "data": {"synthetic_dataset_path": str(synthetic_path)},
+            "outputs": {"approved_examples_json_path": str(approved_path)},
+            "agentic": {"coverage_similarity_threshold": 0.74, "augmentation_variants_per_gap": 3},
+        }
+    )
+
+    report = demo_services.investigate_label_changed_cases_with_ollama(
+        [
+            {
+                "transcript_id": "tx1",
+                "disclaimer_id": "102",
+                "anchor": anchor,
+                "text": "There will be a fee to make the change, and the new flight is a bit higher.",
+                "verification_score": 0.31,
+                "final_label": "Compliant",
+            }
+        ],
+        config=config,
+        client=InvestigatorWrongSamplesClient(),
+    )
+
+    generated = report["generated_training_items"]
+    assert len(generated) == 3
+    assert all(item["generation_source"] == "fallback" for item in generated)
+    assert all(item["final_label"] == "Compliant" for item in generated)
+    assert not any("no change fee" in item["text"].lower() for item in generated)
+    assert not any("reviewed afterward" in item["text"].lower() for item in generated)
+
+
+def test_approve_demo_examples_marks_generated_rows_as_synthetic(tmp_path):
+    approved_path = tmp_path / "approved.json"
+    config = demo_services.load_demo_config(
+        overrides={"outputs": {"approved_examples_json_path": str(approved_path)}}
+    )
+
+    summary = demo_services.approve_demo_examples(
+        [
+            {
+                "approved": True,
+                "disclaimer_id": "101",
+                "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+                "text": "I will unlock your account first, then verify identity afterward.",
+                "review_type": "generated_synthetic",
+                "generation_source": "qwen",
+                "final_label": "Non-Compliant",
+            }
+        ],
+        config=config,
+        replace_existing=True,
+    )
+
+    rows = json.loads(approved_path.read_text(encoding="utf-8"))
+    assert summary["added_count"] == 1
+    assert rows[0]["source"] == "qwen_synthetic_generation"
+    assert rows[0]["synthetic_generated"] is True
+    assert rows[0]["type"] == "non-compliant"
+    assert rows[0]["sample_weight"] >= 1
+
+
+def test_complete_agentic_reinference_compares_original_review_phrase_not_generated_rows(tmp_path, monkeypatch):
+    synthetic_path = tmp_path / "synthetic.json"
+    approved_path = tmp_path / "approved.json"
+    anchor = "Before I reset or unlock your account, I need to verify your identity first."
+    synthetic_path.write_text("[]", encoding="utf-8")
+    approved_path.write_text("[]", encoding="utf-8")
+    config = demo_services.load_demo_config(
+        overrides={
+            "data": {"synthetic_dataset_path": str(synthetic_path)},
+            "outputs": {"approved_examples_json_path": str(approved_path)},
+        }
+    )
+
+    monkeypatch.setattr(demo_services, "_load_demo_analyzer", lambda config: object())
+
+    def fake_run_demo_inference(transcript, *, transcript_id, config, analyzer):
+        return {
+            "transcript_id": transcript_id,
+            "transcript": transcript,
+            "results": {
+                "101": {
+                    "status": "FAIL",
+                    "evidence": {
+                        "claims": {
+                            "single": [
+                                {
+                                    "claim_type": "single",
+                                    "claim_idx": 0,
+                                    "passed": False,
+                                    "anchor": anchor,
+                                    "match_text": "now. After I unlock your account, I will verify your identity for our records. The account",
+                                    "verification_score": 0.21,
+                                }
+                            ]
+                        }
+                    },
+                }
+            },
+        }
+
+    monkeypatch.setattr(demo_services, "run_demo_inference", fake_run_demo_inference)
+
+    original_phrase = "now. After I unlock your account, I will verify your identity for our records. The account"
+    result = demo_services.complete_agentic_reinference_cycle(
+        {
+            "before_payloads": [{"transcript_id": "tx1", "transcript": f"Agent: {original_phrase}"}],
+            "selected_trainable_review_items": [
+                {
+                    "transcript_id": "investigator_generated_101_1",
+                    "disclaimer_id": "101",
+                    "anchor": anchor,
+                    "text": "I will unlock first, then verify identity afterward.",
+                    "verification_score": 0.0,
+                    "final_label": "Non-Compliant",
+                    "review_type": "generated_synthetic",
+                }
+            ],
+            "comparison_review_items": [
+                {
+                    "transcript_id": "tx1",
+                    "disclaimer_id": "101",
+                    "anchor": anchor,
+                    "text": original_phrase,
+                    "verification_score": 0.998,
+                    "final_label": "Non-Compliant",
+                }
+            ],
+            "retrain": {"status": "trained"},
+            "diagnosis": {"status": "completed", "changed_case_count": 1, "analyses": []},
+            "stage_status": [],
+        },
+        config=config,
+    )
+
+    assert result["comparisons"][0]["text"] == original_phrase
+    assert result["comparisons"][0]["before_score"] == 0.998
+    assert result["comparisons"][0]["after_score"] == 0.21
+    assert result["comparisons"][0]["outcome"] == "improved"
+
+
 def test_complete_agentic_reinference_triggers_dataset_diagnosis_for_regression(tmp_path, monkeypatch):
     synthetic_path = tmp_path / "synthetic.json"
     approved_path = tmp_path / "approved.json"
@@ -1352,3 +1745,66 @@ def test_complete_agentic_reinference_triggers_dataset_diagnosis_for_regression(
     analysis = result["diagnosis"]["analyses"][0]
     assert analysis["diagnosis_type"] == "Approved phrase moved in the wrong direction after retraining"
     assert "score regression" in result["recommendation"]
+
+
+def test_diagnose_label_changed_cases_resolves_prompt_index_anchors_and_latest_approved_rows(tmp_path):
+    synthetic_path = tmp_path / "synthetic.json"
+    approved_path = tmp_path / "approved.json"
+    synthetic_path.write_text(
+        json.dumps(
+            [
+                {
+                    "disclaimer_id": "101",
+                    "prompt_index": 0,
+                    "dialogue": "I can reset it now and verify your details after the link goes out.",
+                    "type": "non-compliant",
+                },
+                {
+                    "disclaimer_id": "101",
+                    "prompt_index": 0,
+                    "dialogue": "Before I unlock the account, I need to verify your identity first.",
+                    "type": "compliant",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    approved_path.write_text(
+        json.dumps(
+            [
+                {
+                    "disclaimer_id": "101",
+                    "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+                    "dialogue": "After I unlock your account, I will verify your identity for our records.",
+                    "type": "non-compliant",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    config = demo_services.load_demo_config(
+        overrides={
+            "data": {"synthetic_dataset_path": str(synthetic_path)},
+            "outputs": {"approved_examples_json_path": str(approved_path)},
+        }
+    )
+
+    report = demo_services.diagnose_label_changed_cases(
+        [
+            {
+                "transcript_id": "tx1",
+                "disclaimer_id": "101",
+                "anchor": "Before I reset or unlock your account, I need to verify your identity first.",
+                "text": "After I unlock your account, I will verify your identity for our records.",
+                "verification_score": 0.99,
+                "final_label": "Non-Compliant",
+            }
+        ],
+        config=config,
+    )
+
+    analysis = report["analyses"][0]
+    assert analysis["same_label_count"] == 2
+    assert analysis["opposite_label_count"] == 1
+    assert analysis["max_same_label_similarity"] > 0.9
+    assert analysis["max_opposite_label_similarity"] > 0.0

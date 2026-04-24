@@ -20,6 +20,7 @@ from ..core.disclosures import filter_disclaimers, load_disclaimers
 from ..core.paths import ensure_parent_dir, resolve_project_path
 from ..inference.semantic import DEFAULT_EXCLUDED_RULE_IDS, SemanticComplianceAnalyzer
 from ..training.cross_encoder import train_cross_encoder_with_overrides
+from ..training.data_utils import resolve_training_anchor_text
 from ..training.sentence_transformer import train_sentence_transformer_with_overrides
 
 
@@ -35,6 +36,7 @@ MAX_CHAT_CONTEXT_TEXT_CHARS = 240
 MAX_CHAT_REVIEW_ITEMS = 5
 CHAT_NUM_PREDICT = 768
 LABEL_NUM_PREDICT = 128
+INVESTIGATOR_NUM_PREDICT = 384
 
 
 @dataclass
@@ -698,6 +700,11 @@ def _semantic_anchor_override(item: dict[str, Any]) -> tuple[str, str] | None:
             "fee is waived",
             "without a fee",
             "already confirmed",
+            "confirmed the change first",
+            "reviewed afterward",
+            "discuss it later",
+            "change fee appears",
+            "fee appears",
             "after ticketing",
         )
         if any(term in text for term in negative_fee_terms):
@@ -724,6 +731,9 @@ def _semantic_anchor_override(item: dict[str, Any]) -> tuple[str, str] | None:
             "will not be any travel credit",
             "decide later whether",
             "settled afterward",
+            "fare difference afterward",
+            "work out any fare difference afterward",
+            "fare balance or credit applies",
             "cost details can be settled afterward",
             "not sure yet",
         )
@@ -732,7 +742,7 @@ def _semantic_anchor_override(item: dict[str, Any]) -> tuple[str, str] | None:
                 "Non-Compliant",
                 "The phrase resembles the fare-difference anchor but negates or postpones the payment/credit impact.",
             )
-        pricing_terms = ("higher", "lower", "more expensive", "cheaper", "extra amount", "travel credit", "credit", "balance")
+        pricing_terms = ("fare difference", "higher", "lower", "costs more", "more expensive", "cheaper", "extra amount", "travel credit", "credit", "balance")
         if any(term in text for term in pricing_terms):
             return (
                 "Compliant",
@@ -748,6 +758,9 @@ def _semantic_anchor_override(item: dict[str, Any]) -> tuple[str, str] | None:
             "verify your identity afterward",
             "verify your identity after",
             "after i reset or unlock",
+            "after i unlock your account",
+            "once i unlock your account",
+            "once your account is unlocked",
             "after reset",
             "after unlock",
             "already unlocked",
@@ -925,6 +938,17 @@ def approve_demo_examples(
             or _model_label_from_score(float(item.get("verification_score") or 0.0))
         )
         qwen_label = _review_label_to_model_label(item.get("llm_label"))
+        review_type = str(item.get("review_type", "")).strip()
+        is_generated_synthetic = review_type.lower() == "generated_synthetic"
+        generation_source = str(item.get("generation_source", "")).strip().lower()
+        source = "approved_human_review"
+        if is_generated_synthetic:
+            source = "qwen_synthetic_generation" if generation_source == "qwen" else "investigator_synthetic_generation"
+        training_settings = config.get("training", {})
+        sample_weight = int(training_settings.get("approved_example_weight", 8))
+        if is_generated_synthetic:
+            sample_weight = int(training_settings.get("generated_example_weight", sample_weight))
+        sample_weight = max(1, sample_weight)
         training_row = {
             "disclaimer_id": str(item.get("disclaimer_id", "")).strip(),
             "anchor": str(item.get("anchor", "")).strip(),
@@ -933,8 +957,11 @@ def approve_demo_examples(
             "type": "compliant" if label == "Compliant" else "non-compliant",
             "label": display_label,
             "training_label": label,
-            "source": "approved_human_review",
-            "review_type": str(item.get("review_type", "")).strip(),
+            "source": source,
+            "review_type": review_type,
+            "synthetic_generated": is_generated_synthetic,
+            "generation_source": generation_source,
+            "sample_weight": sample_weight,
             "transcript_id": str(item.get("transcript_id", "interactive_demo")).strip(),
             "verification_score": float(item.get("verification_score") or 0.0),
             "retrieval_score": float(item.get("retrieval_score") or 0.0),
@@ -1206,7 +1233,7 @@ def retrain_demo_verifier(
     return {
         "status": "trained",
         "message": "Retriever and verifier retraining completed on the full augmented dataset.",
-        "dataset_policy": "original_synthetic_plus_latest_approved_phrases",
+        "dataset_policy": "original_synthetic_plus_latest_reviewed_or_generated_rows",
         "approved_count": summary["approved_count"],
         "promotion_recommended": promotion_recommended,
         "promoted": promoted,
@@ -1236,6 +1263,32 @@ def _model_label_from_score(score: float) -> str:
     return "Compliant" if float(score) >= 0.5 else "Non-Compliant"
 
 
+def _review_item_is_generated_synthetic(item: dict[str, Any]) -> bool:
+    return str(item.get("review_type", "")).strip().lower() == "generated_synthetic"
+
+
+def _review_item_has_model_human_disagreement(item: dict[str, Any]) -> bool:
+    final_label = str(item.get("final_label") or item.get("llm_label") or "").strip()
+    if final_label not in {"Compliant", "Non-Compliant"}:
+        return False
+    try:
+        score = float(item.get("verification_score") or 0.0)
+    except (TypeError, ValueError):
+        score = 0.0
+    model_label = _review_label_to_model_label(item.get("model_label")) or _model_label_from_score(score)
+    return model_label != final_label
+
+
+def _review_item_should_be_compared(item: dict[str, Any]) -> bool:
+    if _review_item_is_generated_synthetic(item):
+        return False
+    final_label = str(item.get("final_label") or item.get("llm_label") or "").strip()
+    if final_label not in {"Compliant", "Non-Compliant"}:
+        return False
+    review_type = str(item.get("review_type", "")).strip().lower()
+    return review_type == "borderline" or _review_item_has_model_human_disagreement(item)
+
+
 def _dataset_label_to_model_label(value: Any) -> str:
     text = str(value or "").strip().lower().replace("_", "-")
     if text in {"compliant", "positive", "pass"}:
@@ -1253,9 +1306,23 @@ def _text_similarity(left: Any, right: Any) -> float:
     return SequenceMatcher(None, left_text, right_text).ratio()
 
 
-def _anchor_matches(row: dict[str, Any], *, disclaimer_id: str, anchor: str) -> bool:
+def _resolved_dataset_anchor(row: dict[str, Any], disclosures: dict[str, Any] | None) -> str:
+    if disclosures is not None:
+        resolved = resolve_training_anchor_text(row, disclosures)
+        if isinstance(resolved, str) and resolved.strip():
+            return resolved.strip()
+    return str(row.get("anchor", "")).strip()
+
+
+def _anchor_matches(
+    row: dict[str, Any],
+    *,
+    disclaimer_id: str,
+    anchor: str,
+    disclosures: dict[str, Any] | None = None,
+) -> bool:
     row_disclaimer = str(row.get("disclaimer_id", "")).strip()
-    row_anchor = " ".join(str(row.get("anchor", "")).strip().lower().split())
+    row_anchor = " ".join(_resolved_dataset_anchor(row, disclosures).lower().split())
     target_anchor = " ".join(str(anchor or "").strip().lower().split())
     return row_disclaimer == str(disclaimer_id).strip() and row_anchor == target_anchor
 
@@ -1272,7 +1339,11 @@ def diagnose_label_changed_cases(
     similarity_threshold = float(settings.get("coverage_similarity_threshold", 0.74))
     weak_count_threshold = int(settings.get("coverage_weak_count_threshold", 2))
 
-    base_rows = _load_dataset_rows(config.get("data", {}).get("synthetic_dataset_path", ""))
+    data_settings = config.get("data", {})
+    disclosures_path = data_settings.get("disclosures_file", "")
+    disclosures = _json_load(disclosures_path, {}) if disclosures_path else {}
+    disclosures = disclosures if isinstance(disclosures, dict) else {}
+    base_rows = _load_dataset_rows(data_settings.get("synthetic_dataset_path", ""))
     prior_approved_rows = _load_approved_examples(config)
     dataset_rows = [*base_rows, *prior_approved_rows]
 
@@ -1294,7 +1365,7 @@ def diagnose_label_changed_cases(
         anchor_rows = [
             row
             for row in dataset_rows
-            if isinstance(row, dict) and _anchor_matches(row, disclaimer_id=disclaimer_id, anchor=anchor)
+            if isinstance(row, dict) and _anchor_matches(row, disclaimer_id=disclaimer_id, anchor=anchor, disclosures=disclosures)
         ]
         same_label_rows = [
             row for row in anchor_rows if _dataset_label_to_model_label(row.get("type")) == final_label
@@ -1417,6 +1488,424 @@ def diagnose_label_changed_cases(
     return report
 
 
+INVESTIGATOR_OUTCOMES = {
+    "missing_coverage",
+    "covered_but_under_represented",
+    "covered_but_boundary_confusing",
+    "possible_label_noise",
+}
+
+REGRESSION_INVESTIGATOR_OUTCOMES = {
+    "missing_coverage",
+    "under_represented_pattern",
+    "boundary_regression",
+    "possible_label_noise",
+}
+
+
+def _fallback_generated_samples_for_analysis(analysis: dict[str, Any], *, count: int = 3) -> list[str]:
+    anchor = str(analysis.get("anchor", "")).lower()
+    phrase = str(analysis.get("phrase", "")).strip()
+    phrase_lower = phrase.lower()
+    human_label = _dataset_label_to_model_label(analysis.get("human_label"))
+    is_pass = human_label == "Compliant"
+
+    samples: list[str]
+    if ("reset or unlock" in anchor or "verify your identity" in anchor) and not is_pass:
+        if "after i unlock your account" in phrase_lower or ("for our records" in phrase_lower and "unlock" in phrase_lower):
+            samples = [
+                "After I unlock your account, I will verify your identity for our records.",
+                "Once I unlock your account, I will verify your identity for our records.",
+                "I will verify your identity for our records after I unlock your account.",
+            ]
+        else:
+            samples = [
+                "I will unlock your account first, then verify your identity afterward for the ticket.",
+                "Your account is already unlocked, and I will verify your identity afterward for our records.",
+                "I can restore access right away, and then verify your identity after the account is open.",
+            ]
+    elif "reset or unlock" in anchor or "verify your identity" in anchor:
+        samples = [
+            "Before I unlock your account, I need to verify your identity first for security.",
+            "Before I reset the account, I need to confirm your identity first.",
+            "Identity verification has to be completed first before I restore access to your account.",
+        ]
+    elif "change fee" in anchor and is_pass:
+        if "fee to make the change" in phrase_lower or ("new flight is a bit higher" in phrase_lower and "fee" in phrase_lower):
+            samples = [
+                "There will be a fee to make the change before I confirm the new flight for you.",
+                "There is a fee to make this change, and I need to disclose that before I confirm the new itinerary.",
+                "The new flight is a bit higher and there is a fee to make the change, so I need to go through that before confirmation.",
+            ]
+        else:
+            samples = [
+                "Before I confirm this booking change, a change fee will apply to the exchange.",
+                "There will be a fee to make this booking change before I confirm the new itinerary.",
+                "Before I confirm the new itinerary, you need to acknowledge that the airline change fee applies.",
+            ]
+    elif "change fee" in anchor:
+        samples = [
+            "There is no change fee for this booking change, so I can confirm it now.",
+            "I have confirmed the change first, and any fee can be reviewed afterward.",
+            "The booking is changed now; if a change fee appears, we can discuss it later.",
+        ]
+    elif "fare difference" in anchor or "travel credit" in anchor:
+        samples = [
+            "There is a fare difference on the new itinerary, so you will pay the extra amount before I confirm it.",
+            "The new flight costs more, so the fare difference will be charged before the booking change is confirmed.",
+            "If the new itinerary is cheaper, the remaining balance will be issued as travel credit before confirmation.",
+        ] if is_pass else [
+            "We will decide later whether you pay the extra amount or receive travel credit.",
+            "I can confirm the new itinerary now and work out any fare difference afterward.",
+            "The new itinerary is confirmed, and we will decide later whether any fare balance or credit applies.",
+        ]
+    else:
+        samples = [phrase] if phrase else []
+    deduped: list[str] = []
+    for sample in samples:
+        cleaned = " ".join(str(sample).strip().split())
+        if cleaned and cleaned.lower() != phrase.lower() and cleaned not in deduped:
+            deduped.append(cleaned)
+    if phrase and not deduped:
+        deduped.append(phrase)
+    return deduped[:count]
+
+
+def _coerce_investigator_outcome(value: Any, fallback: str) -> str:
+    text = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "thin_coverage": "covered_but_under_represented",
+        "under_represented": "covered_but_under_represented",
+        "underrepresented": "covered_but_under_represented",
+        "covered_underrepresented": "covered_but_under_represented",
+        "boundary_confusing": "covered_but_boundary_confusing",
+        "label_noise": "possible_label_noise",
+    }
+    text = aliases.get(text, text)
+    if text in INVESTIGATOR_OUTCOMES:
+        return text
+    return fallback if fallback in INVESTIGATOR_OUTCOMES else "missing_coverage"
+
+
+def _coerce_regression_investigator_outcome(value: Any, fallback: str) -> str:
+    text = str(value or "").strip().lower().replace("-", "_").replace(" ", "_")
+    aliases = {
+        "thin_coverage": "under_represented_pattern",
+        "under_represented": "under_represented_pattern",
+        "underrepresented": "under_represented_pattern",
+        "covered_but_under_represented": "under_represented_pattern",
+        "covered_but_boundary_confusing": "boundary_regression",
+        "post_retrain_boundary_regression": "boundary_regression",
+        "boundary_confusing": "boundary_regression",
+        "label_noise": "possible_label_noise",
+    }
+    text = aliases.get(text, text)
+    if text in REGRESSION_INVESTIGATOR_OUTCOMES:
+        return text
+    return fallback if fallback in REGRESSION_INVESTIGATOR_OUTCOMES else "boundary_regression"
+
+
+def _clean_investigator_sample(sample: Any, *, original_phrase: str, existing: set[str]) -> str:
+    cleaned = " ".join(str(sample or "").strip().split())
+    if not cleaned:
+        return ""
+    if original_phrase and cleaned.lower() == original_phrase.lower():
+        return ""
+    key = cleaned.lower()
+    if key in existing:
+        return ""
+    return cleaned
+
+
+def _generated_sample_matches_human_label(*, anchor: str, sample: str, human_label: Any) -> bool:
+    expected_label = _dataset_label_to_model_label(human_label)
+    if expected_label not in {"Compliant", "Non-Compliant"}:
+        return True
+    override = _semantic_anchor_override({"anchor": anchor, "text": sample})
+    if override is None:
+        return True
+    return override[0] == expected_label
+
+
+def _generate_missing_coverage_samples_with_qwen(
+    *,
+    client: OllamaChatClient,
+    analysis: dict[str, Any],
+    count: int = 3,
+) -> list[str]:
+    """Ask Qwen for targeted samples when the coverage classifier did not return enough."""
+    system_prompt = (
+        "You are DataGeneratorAgent for a local policy-compliance demo.\n"
+        "Use non-thinking mode. Do not reveal reasoning or chain-of-thought.\n"
+        "Generate short candidate training phrases for the requested corrected label.\n"
+        "Return exactly one JSON object with key generated_samples."
+    )
+    payload = {
+        "task": f"Generate exactly {count} short synthetic phrases for the corrected human label.",
+        "rule_id": analysis.get("disclaimer_id", ""),
+        "anchor": analysis.get("anchor", ""),
+        "reviewed_phrase": analysis.get("phrase", ""),
+        "human_label": analysis.get("human_label", ""),
+        "requirements": [
+            "The phrases must match the corrected human_label, not the model label.",
+            "If human_label is Compliant, generate clear pass phrases that satisfy the target anchor.",
+            "If human_label is Non-Compliant, generate hard-negative fail phrases that violate the target anchor.",
+            "The phrases should be semantically close to the reviewed failure mode.",
+            "Do not copy the reviewed phrase exactly.",
+            "Keep each phrase one sentence and suitable as a training example.",
+        ],
+    }
+    raw_response = client.chat(
+        system_prompt=system_prompt,
+        user_prompt=(
+            "/no_think\n"
+            f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n"
+            "/no_think\n"
+            "Return final JSON only."
+        ),
+        temperature=0.4,
+        json_mode=True,
+        num_predict=INVESTIGATOR_NUM_PREDICT,
+    )
+    parsed = _parse_llm_json(raw_response)
+    samples = parsed.get("generated_samples") if isinstance(parsed, dict) else []
+    if not isinstance(samples, list):
+        return []
+
+    original_phrase = str(analysis.get("phrase", "")).strip()
+    anchor = str(analysis.get("anchor", "")).strip()
+    human_label = analysis.get("human_label", "")
+    existing: set[str] = set()
+    cleaned_samples: list[str] = []
+    for sample in samples:
+        cleaned = _clean_investigator_sample(sample, original_phrase=original_phrase, existing=existing)
+        if cleaned and _generated_sample_matches_human_label(anchor=anchor, sample=cleaned, human_label=human_label):
+            cleaned_samples.append(cleaned)
+            existing.add(cleaned.lower())
+        if len(cleaned_samples) >= count:
+            break
+    return cleaned_samples
+
+
+def investigate_label_changed_cases_with_ollama(
+    items: Iterable[dict[str, Any]],
+    *,
+    config: dict[str, Any] | None = None,
+    config_path: str | None = None,
+    client: OllamaChatClient | None = None,
+) -> dict[str, Any]:
+    """Use Qwen to classify dataset coverage gaps and propose candidate samples."""
+    config = config or load_demo_config(config_path)
+    base_report = diagnose_label_changed_cases(items, config=config)
+    analyses = base_report.get("analyses", []) if isinstance(base_report, dict) else []
+    if not isinstance(analyses, list) or not analyses:
+        return base_report
+
+    client = client or _ollama_client_from_config(config)
+    target_generated_count = int(config.get("agentic", {}).get("augmentation_variants_per_gap", 3))
+    target_generated_count = max(1, target_generated_count)
+    system_prompt = (
+        "You are InvestigatorAgent for a local policy-compliance demo.\n"
+        "Use non-thinking mode. Do not reveal reasoning or chain-of-thought.\n"
+        "Your job is to inspect a model/human disagreement against compact synthetic-dataset evidence.\n"
+        "Choose exactly one outcome: missing_coverage, covered_but_under_represented, "
+        "covered_but_boundary_confusing, possible_label_noise.\n"
+        f"If outcome is missing_coverage, generate exactly {target_generated_count} short candidate training phrases for the corrected human label.\n"
+        "If coverage is not missing, generated_samples should be an empty list.\n"
+        "Return exactly one JSON object with keys: outcome, rationale, generated_samples."
+    )
+
+    enriched: list[dict[str, Any]] = []
+    for analysis in analyses:
+        fallback_outcome = "missing_coverage" if "missing_coverage" in analysis.get("cause_tags", []) else (
+            "covered_but_under_represented" if "thin_coverage" in analysis.get("cause_tags", []) else "covered_but_boundary_confusing"
+        )
+        payload = {
+            "task": "Classify whether synthetic data coverage explains this model/human disagreement.",
+            "allowed_outcomes": sorted(INVESTIGATOR_OUTCOMES),
+            "rule_id": analysis.get("disclaimer_id", ""),
+            "anchor": analysis.get("anchor", ""),
+            "reviewed_phrase": analysis.get("phrase", ""),
+            "model_label": analysis.get("model_label", ""),
+            "human_label": analysis.get("human_label", ""),
+            "deterministic_signal": {
+                "same_label_count": analysis.get("same_label_count", 0),
+                "opposite_label_count": analysis.get("opposite_label_count", 0),
+                "max_same_label_similarity": analysis.get("max_same_label_similarity", 0.0),
+                "max_opposite_label_similarity": analysis.get("max_opposite_label_similarity", 0.0),
+                "cause_tags": analysis.get("cause_tags", []),
+            },
+            "same_label_examples": analysis.get("same_label_examples", [])[:3],
+            "opposite_label_examples": analysis.get("opposite_label_examples", [])[:3],
+            "decision_guidance": {
+                "missing_coverage": "Use when no close same-label synthetic examples cover the reviewed phrase pattern.",
+                "covered_but_under_represented": "Use when similar same-label examples exist but are too few or not diverse enough.",
+                "covered_but_boundary_confusing": "Use when coverage exists but the model likely needs the reviewed phrase as an emphasis/boundary sample.",
+                "possible_label_noise": "Use when opposite-label examples look very similar and may be mislabeled or too close.",
+            },
+        }
+        try:
+            raw_response = client.chat(
+                system_prompt=system_prompt,
+                user_prompt=(
+                    "/no_think\n"
+                    f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n"
+                    "/no_think\n"
+                    "Return final JSON only."
+                ),
+                temperature=0.2,
+                json_mode=True,
+                num_predict=INVESTIGATOR_NUM_PREDICT,
+            )
+            parsed = _parse_llm_json(raw_response)
+        except Exception as exc:
+            parsed = {
+                "outcome": fallback_outcome,
+                "rationale": f"Qwen investigation failed, so deterministic coverage signal was used: {exc}",
+                "generated_samples": [],
+            }
+
+        outcome = _coerce_investigator_outcome(parsed.get("outcome"), fallback=fallback_outcome)
+        rationale = str(parsed.get("rationale", "")).strip()
+        if not rationale:
+            rationale = (
+                f"Qwen outcome `{outcome}` was used with deterministic coverage evidence: "
+                f"{analysis.get('same_label_count', 0)} same-label sample(s), "
+                f"{analysis.get('opposite_label_count', 0)} opposite-label sample(s)."
+            )
+        original_phrase = str(analysis.get("phrase", "")).strip()
+        anchor = str(analysis.get("anchor", "")).strip()
+        human_label = analysis.get("human_label", "")
+        existing_sample_keys: set[str] = set()
+        generated_samples: list[str] = []
+        generated_sample_sources: list[str] = []
+        for sample in parsed.get("generated_samples") or []:
+            cleaned = _clean_investigator_sample(
+                sample,
+                original_phrase=original_phrase,
+                existing=existing_sample_keys,
+            )
+            if cleaned and _generated_sample_matches_human_label(anchor=anchor, sample=cleaned, human_label=human_label):
+                generated_samples.append(cleaned)
+                generated_sample_sources.append("qwen")
+                existing_sample_keys.add(cleaned.lower())
+            if len(generated_samples) >= target_generated_count:
+                break
+        should_generate_samples = outcome != "possible_label_noise"
+        if should_generate_samples and len(generated_samples) < target_generated_count:
+            try:
+                for sample in _generate_missing_coverage_samples_with_qwen(
+                    client=client,
+                    analysis=analysis,
+                    count=target_generated_count,
+                ):
+                    cleaned = _clean_investigator_sample(
+                        sample,
+                        original_phrase=original_phrase,
+                        existing=existing_sample_keys,
+                    )
+                    if cleaned and _generated_sample_matches_human_label(anchor=anchor, sample=cleaned, human_label=human_label):
+                        generated_samples.append(cleaned)
+                        generated_sample_sources.append("qwen")
+                        existing_sample_keys.add(cleaned.lower())
+                    if len(generated_samples) >= target_generated_count:
+                        break
+            except Exception:
+                pass
+        if should_generate_samples and len(generated_samples) < target_generated_count:
+            for sample in _fallback_generated_samples_for_analysis(analysis, count=target_generated_count):
+                cleaned = _clean_investigator_sample(
+                    sample,
+                    original_phrase=original_phrase,
+                    existing=existing_sample_keys,
+                )
+                if cleaned and _generated_sample_matches_human_label(anchor=anchor, sample=cleaned, human_label=human_label):
+                    generated_samples.append(cleaned)
+                    generated_sample_sources.append("fallback")
+                    existing_sample_keys.add(cleaned.lower())
+                if len(generated_samples) >= target_generated_count:
+                    break
+        if not should_generate_samples:
+            generated_samples = []
+            generated_sample_sources = []
+
+        generated_sample_source = ""
+        if generated_sample_sources:
+            unique_sources = set(generated_sample_sources)
+            generated_sample_source = generated_sample_sources[0] if len(unique_sources) == 1 else "mixed"
+
+        generated_training_items = []
+        for sample_index, sample in enumerate(generated_samples, start=1):
+            generated_training_items.append(
+                {
+                    "transcript_id": f"investigator_generated_{analysis.get('disclaimer_id', 'rule')}_{sample_index}",
+                    "disclaimer_id": str(analysis.get("disclaimer_id", "")).strip(),
+                    "anchor": str(analysis.get("anchor", "")).strip(),
+                    "text": sample,
+                    "retrieval_score": 0.0,
+                    "verification_score": 0.0,
+                    "claim_order": int(sample_index),
+                    "review_type": "generated_synthetic",
+                    "model_label": "Generated",
+                    "llm_label": analysis.get("human_label", ""),
+                    "final_label": analysis.get("human_label", ""),
+                    "llm_confidence": 0.0,
+                    "llm_rationale": rationale,
+                    "approved": False,
+                    "source": "investigator_generated",
+                    "generation_source": (
+                        generated_sample_sources[sample_index - 1]
+                        if sample_index - 1 < len(generated_sample_sources)
+                        else generated_sample_source
+                    ),
+                }
+            )
+
+        cause_tags = [outcome]
+        if "possible_label_noise" in analysis.get("cause_tags", []) and outcome != "possible_label_noise":
+            cause_tags.append("possible_label_noise")
+
+        if outcome == "missing_coverage":
+            recommendation = "Generate targeted examples for this missing pattern; optionally add the exact reviewed phrase too."
+            solution_steps = ["Review the generated samples, tick approved rows, then retrain on the augmented dataset."]
+        elif outcome == "covered_but_under_represented":
+            recommendation = "Coverage exists but is too thin, so add targeted generated phrases to strengthen this pattern before retraining."
+            solution_steps = ["Review the generated samples, tick approved rows, then retrain on the augmented dataset."]
+        elif outcome == "possible_label_noise":
+            recommendation = "Inspect similar opposite-label synthetic examples before adding more data."
+            solution_steps = ["Review possible label-noise examples, then decide whether to correct data or add the reviewed phrase."]
+        else:
+            recommendation = "Coverage exists, but the model still needs targeted boundary examples for this failed prediction before retraining."
+            solution_steps = ["Review the generated samples, tick approved rows, then retrain on the augmented dataset."]
+
+        enriched.append(
+            {
+                **analysis,
+                "cause_tags": cause_tags,
+                "investigator_outcome": outcome,
+                "investigator_rationale": rationale,
+                "generated_samples": generated_samples,
+                "generated_sample_source": generated_sample_source,
+                "generated_training_items": generated_training_items,
+                "recommendation": recommendation,
+                "solution_steps": solution_steps,
+            }
+        )
+
+    generated_items = [item for analysis in enriched for item in analysis.get("generated_training_items", [])]
+    report = {
+        **base_report,
+        "status": "completed",
+        "investigator": "qwen",
+        "changed_case_count": len(enriched),
+        "generated_count": len(generated_items),
+        "analyses": enriched,
+        "generated_training_items": generated_items,
+    }
+    _json_save("data/results/demo/agentic/app_loop_dataset_diagnosis.json", report)
+    return report
+
+
 def diagnose_score_regressions(
     comparisons: Iterable[dict[str, Any]],
     *,
@@ -1429,7 +1918,11 @@ def diagnose_score_regressions(
     similarity_threshold = float(settings.get("coverage_similarity_threshold", 0.74))
     weak_count_threshold = int(settings.get("coverage_weak_count_threshold", 2))
 
-    base_rows = _load_dataset_rows(config.get("data", {}).get("synthetic_dataset_path", ""))
+    data_settings = config.get("data", {})
+    disclosures_path = data_settings.get("disclosures_file", "")
+    disclosures = _json_load(disclosures_path, {}) if disclosures_path else {}
+    disclosures = disclosures if isinstance(disclosures, dict) else {}
+    base_rows = _load_dataset_rows(data_settings.get("synthetic_dataset_path", ""))
     prior_approved_rows = _load_approved_examples(config)
     dataset_rows = [*base_rows, *prior_approved_rows]
 
@@ -1447,7 +1940,7 @@ def diagnose_score_regressions(
         anchor_rows = [
             row
             for row in dataset_rows
-            if isinstance(row, dict) and _anchor_matches(row, disclaimer_id=disclaimer_id, anchor=anchor)
+            if isinstance(row, dict) and _anchor_matches(row, disclaimer_id=disclaimer_id, anchor=anchor, disclosures=disclosures)
         ]
         same_label_rows = [
             row for row in anchor_rows if _dataset_label_to_model_label(row.get("type")) == final_label
@@ -1569,6 +2062,124 @@ def diagnose_score_regressions(
         "status": "completed",
         "regressed_case_count": len(analyses),
         "analyses": analyses,
+    }
+    _json_save("data/results/demo/agentic/app_loop_score_regression_diagnosis.json", report)
+    return report
+
+
+
+def investigate_score_regressions_with_ollama(
+    comparisons: Iterable[dict[str, Any]],
+    *,
+    config: dict[str, Any] | None = None,
+    config_path: str | None = None,
+    client: OllamaChatClient | None = None,
+) -> dict[str, Any]:
+    """Use Qwen to inspect score regressions after retraining."""
+    config = config or load_demo_config(config_path)
+    base_report = diagnose_score_regressions(comparisons, config=config)
+    analyses = base_report.get("analyses", []) if isinstance(base_report, dict) else []
+    if not isinstance(analyses, list) or not analyses:
+        return base_report
+
+    client = client or _ollama_client_from_config(config)
+    system_prompt = (
+        "You are InvestigatorAgent for a local policy-compliance demo.\n"
+        "Use non-thinking mode. Do not reveal reasoning or chain-of-thought.\n"
+        "Inspect phrases whose score moved in the wrong direction after retraining.\n"
+        "Choose exactly one outcome: missing_coverage, under_represented_pattern, boundary_regression, possible_label_noise.\n"
+        "Return exactly one JSON object with keys: outcome, rationale, recommendation."
+    )
+
+    enriched: list[dict[str, Any]] = []
+    for analysis in analyses:
+        if "missing_coverage" in analysis.get("cause_tags", []):
+            fallback_outcome = "missing_coverage"
+        elif "thin_coverage" in analysis.get("cause_tags", []):
+            fallback_outcome = "under_represented_pattern"
+        elif "possible_label_noise" in analysis.get("cause_tags", []):
+            fallback_outcome = "possible_label_noise"
+        else:
+            fallback_outcome = "boundary_regression"
+
+        payload = {
+            "task": "Classify why the reviewed phrase regressed after retraining and recommend the next action.",
+            "allowed_outcomes": sorted(REGRESSION_INVESTIGATOR_OUTCOMES),
+            "rule_id": analysis.get("disclaimer_id", ""),
+            "anchor": analysis.get("anchor", ""),
+            "reviewed_phrase": analysis.get("phrase", ""),
+            "human_label": analysis.get("human_label", ""),
+            "before_score": analysis.get("before_score", 0.0),
+            "after_score": analysis.get("after_score", 0.0),
+            "target_direction": analysis.get("target_direction", ""),
+            "deterministic_signal": {
+                "cause_tags": analysis.get("cause_tags", []),
+                "same_label_count": analysis.get("same_label_count", 0),
+                "opposite_label_count": analysis.get("opposite_label_count", 0),
+                "max_same_label_similarity": analysis.get("max_same_label_similarity", 0.0),
+                "max_opposite_label_similarity": analysis.get("max_opposite_label_similarity", 0.0),
+            },
+            "same_label_examples": analysis.get("same_label_examples", [])[:2],
+            "opposite_label_examples": analysis.get("opposite_label_examples", [])[:2],
+            "decision_guidance": {
+                "missing_coverage": "Use when the reviewed phrase pattern still is not covered closely enough by same-label data.",
+                "under_represented_pattern": "Use when similar same-label data exists but not strongly enough to hold the boundary after retraining.",
+                "boundary_regression": "Use when coverage exists and the problem looks like weak boundary learning after retraining.",
+                "possible_label_noise": "Use when opposite-label examples are suspiciously close and may be mislabeled or too confusing.",
+            },
+        }
+
+        try:
+            raw_response = client.chat(
+                system_prompt=system_prompt,
+                user_prompt=(
+                    "/no_think\n"
+                    f"{json.dumps(payload, ensure_ascii=False, indent=2)}\n"
+                    "/no_think\n"
+                    "Return final JSON only."
+                ),
+                temperature=0.2,
+                json_mode=True,
+                num_predict=INVESTIGATOR_NUM_PREDICT,
+            )
+            parsed = _parse_llm_json(raw_response)
+        except Exception as exc:
+            parsed = {
+                "outcome": fallback_outcome,
+                "rationale": f"Qwen regression investigation failed, so deterministic evidence was used: {exc}",
+                "recommendation": "",
+            }
+
+        outcome = _coerce_regression_investigator_outcome(parsed.get("outcome"), fallback=fallback_outcome)
+        rationale = str(parsed.get("rationale", "")).strip()
+        recommendation = str(parsed.get("recommendation", "")).strip()
+        if not rationale:
+            rationale = "Agent review completed from the before/after movement and nearby dataset examples."
+        if not recommendation:
+            if outcome == "missing_coverage":
+                recommendation = "Generate more same-label examples for this exact pattern before the next retrain."
+            elif outcome == "under_represented_pattern":
+                recommendation = "Keep the reviewed phrase in training and add a few nearby same-label variants before retraining again."
+            elif outcome == "possible_label_noise":
+                recommendation = "Inspect nearby opposite-label samples before another retrain because the dataset may be sending mixed signals."
+            else:
+                recommendation = "Retrain again with stronger emphasis on this phrase and inspect nearby boundary examples."
+
+        enriched.append(
+            {
+                **analysis,
+                "investigator": "qwen",
+                "investigator_outcome": outcome,
+                "investigator_rationale": rationale,
+                "recommendation": recommendation,
+            }
+        )
+
+    report = {
+        **base_report,
+        "status": "completed",
+        "investigator": "qwen",
+        "analyses": enriched,
     }
     _json_save("data/results/demo/agentic/app_loop_score_regression_diagnosis.json", report)
     return report
@@ -1850,6 +2461,11 @@ def run_agentic_review_cycle(
         f"{display_borderline_count} borderline phrase(s) and "
         f"{pass_qwen_fail_count} model-pass/Qwen-fail phrase(s)."
     )
+    recommendation_lines = [
+        "Human approval is required before retraining.",
+        "",
+        f"**{prepared_message}**",
+    ]
     summary_lines = [*_summarize_rule_evidence(before_payloads)]
     result = {
         "status": "awaiting_human_approval",
@@ -1863,15 +2479,15 @@ def run_agentic_review_cycle(
         "review_candidates": labeled_candidates,
         "stage_status": [
             *stage_status,
+            classifier_status,
             {
                 "agent": "SupervisorAgent",
                 "status": "needs_human_approval",
                 "message": f"Identified {display_borderline_count} borderline phrase(s) and {pass_qwen_fail_count} model-pass/Qwen-fail phrase(s).",
             },
-            classifier_status,
         ],
         "supervisor_summary": "\n".join(summary_lines),
-        "recommendation": f"Human approval is required before retraining.\n\n**{prepared_message}**",
+        "recommendation": "\n".join(recommendation_lines),
     }
     _json_save("data/results/demo/agentic/app_loop_review.json", result)
     return result
@@ -1969,8 +2585,13 @@ def prepare_agentic_training_cycle(
             "comparisons": [],
         }
 
-    diagnosis = diagnose_label_changed_cases(selected_trainable, config=config)
+    selected_non_generated = [item for item in selected_trainable if not _review_item_is_generated_synthetic(item)]
+    comparison_items = [item for item in approved_rows if _review_item_should_be_compared(item)]
+    if not comparison_items:
+        comparison_items = selected_non_generated
+
     approval_summary = approve_demo_examples(selected_trainable, config=config, replace_existing=True)
+    diagnosis = diagnose_label_changed_cases(comparison_items or selected_trainable, config=config)
     if approval_summary.get("added_count", 0) == 0 and approval_summary.get("approved_count", 0) == 0:
         return {
             "status": "blocked",
@@ -1991,6 +2612,7 @@ def prepare_agentic_training_cycle(
             "comparisons": [],
             "before_payloads": before_payloads,
             "selected_trainable_review_items": selected_trainable,
+            "comparison_review_items": comparison_items,
             "stage_status": [
                 {
                     "agent": "SupervisorAgent",
@@ -2015,6 +2637,7 @@ def prepare_agentic_training_cycle(
         "retrain": retrain_result,
         "before_payloads": before_payloads,
         "selected_trainable_review_items": selected_trainable,
+        "comparison_review_items": comparison_items,
         "comparisons": [],
         "stage_status": [
             {
@@ -2043,7 +2666,7 @@ def complete_agentic_reinference_cycle(
     config = config or load_demo_config(config_path)
     state = retrain_state if isinstance(retrain_state, dict) else {}
     before_payloads = state.get("before_payloads", [])
-    selected_trainable = state.get("selected_trainable_review_items", [])
+    selected_trainable = state.get("comparison_review_items") or state.get("selected_trainable_review_items", [])
     retrain_result = state.get("retrain", {})
     if not isinstance(before_payloads, list) or not before_payloads:
         return {
@@ -2056,7 +2679,7 @@ def complete_agentic_reinference_cycle(
         return {
             **state,
             "status": "blocked",
-            "message": "No selected training rows were available for before/after comparison.",
+            "message": "No reviewed transcript rows were available for before/after comparison.",
             "comparisons": [],
         }
     if not isinstance(retrain_result, dict) or retrain_result.get("status") != "trained":

@@ -93,3 +93,89 @@ def test_prepare_training_rows_resolves_multi_anchor_prompt_index():
 
     assert len(rows) == 1
     assert rows[0]["sentence1"] == disclosures["102"]["anchor"]["mandatory"][1]
+
+
+def test_generate_triplet_rows_uses_extra_hard_and_cross_claim_topic_negatives():
+    dataset_rows = [
+        {
+            "disclaimer_id": "101",
+            "anchor": "Anchor A",
+            "dialogue": "Positive A",
+            "type": "compliant",
+        },
+        {
+            "disclaimer_id": "101",
+            "anchor": "Anchor A",
+            "dialogue": "Negative A",
+            "type": "non-compliant",
+        },
+        {
+            "disclaimer_id": "102",
+            "anchor": "Anchor B",
+            "dialogue": "Positive B",
+            "type": "compliant",
+        },
+        {
+            "disclaimer_id": "102",
+            "anchor": "Anchor B",
+            "dialogue": "Negative B",
+            "type": "non-compliant",
+        },
+    ]
+
+    base_triplets = generate_triplet_rows(
+        dataset_rows,
+        seed=42,
+        use_extra_sampling=False,
+    )
+    sampled_triplets = generate_triplet_rows(
+        dataset_rows,
+        seed=42,
+        use_extra_sampling=True,
+        extra_hard_negatives_per_positive=2,
+        topic_negatives_per_positive=2,
+    )
+
+    assert len(base_triplets["anchor"]) == 2
+    assert len(sampled_triplets["anchor"]) > len(base_triplets["anchor"])
+    assert "Positive B" in sampled_triplets["negative"]
+    assert "Positive A" in sampled_triplets["negative"]
+
+
+def test_training_data_respects_sample_weight_for_reviewer_rows():
+    disclosures = _load_disclosures()
+    dataset_rows = [
+        {
+            "disclaimer_id": "101",
+            "anchor": disclosures["101"]["anchor"],
+            "dialogue": "Before I unlock the account, I verify identity first.",
+            "type": "compliant",
+        },
+        {
+            "disclaimer_id": "101",
+            "anchor": disclosures["101"]["anchor"],
+            "dialogue": "I unlock the account now, then verify identity afterward.",
+            "type": "non-compliant",
+            "sample_weight": 4,
+        },
+    ]
+
+    ce_path = Path(__file__).resolve().parent / "tmp_weighted_training_rows.json"
+    ce_path.write_text(json.dumps(dataset_rows), encoding="utf-8")
+    config = {
+        "data": {
+            "disclosures_file": "resources/demo_disclosures.json",
+            "synthetic_dataset_path": str(ce_path),
+        },
+        "training": {"use_extra_sampling": False},
+    }
+    try:
+        ce_rows = prepare_training_rows(config, dataset_path=str(ce_path))
+    finally:
+        ce_path.unlink(missing_ok=True)
+
+    triplets = generate_triplet_rows(dataset_rows, seed=42, disclosures=disclosures, use_extra_sampling=False)
+
+    assert sum(1 for row in ce_rows if row["label"] == 0.0) == 4
+    assert len(triplets["anchor"]) == 1
+    assert triplets["negative"][0] == "I unlock the account now, then verify identity afterward."

@@ -143,7 +143,13 @@ def prepare_training_rows(config: dict[str, Any], dataset_path: str | None = Non
             skipped_unknown += 1
             continue
 
-        rows.append({"sentence1": anchor_text, "sentence2": dialogue.strip(), "label": label})
+        try:
+            sample_weight = int(entry.get("sample_weight", 1) or 1)
+        except (TypeError, ValueError):
+            sample_weight = 1
+        sample_weight = max(1, sample_weight)
+        for _ in range(sample_weight):
+            rows.append({"sentence1": anchor_text, "sentence2": dialogue.strip(), "label": label})
 
     if training_settings.get("use_extra_sampling", True):
         _add_confusion_pair_negatives(
@@ -185,9 +191,7 @@ def train_cross_encoder_with_overrides(
     config = config or load_config(config_path)
     configure_cpu_runtime(int(config.get("runtime", {}).get("cpu_threads", 8)))
 
-    from sklearn.model_selection import train_test_split
     from sentence_transformers import CrossEncoder, InputExample
-    from sentence_transformers.cross_encoder.evaluation import CrossEncoderClassificationEvaluator
     from torch.utils.data import DataLoader
 
     training_settings = config.get("training", {})
@@ -198,14 +202,12 @@ def train_cross_encoder_with_overrides(
         raise ValueError("No training rows were produced from the configured dataset.")
 
     model_name = base_model_name_or_path or model_settings.get("cross_encoder_base", DEFAULT_CROSS_ENCODER_BASE)
-    output_dir_monitor = resolve_project_path(monitor_output_dir or "data/results/checkpoints/ce_eval")
     output_dir_final = resolve_project_path(output_dir or model_settings["cross_encoder_output_dir"])
-    output_dir_monitor.mkdir(parents=True, exist_ok=True)
     output_dir_final.mkdir(parents=True, exist_ok=True)
 
     max_length = int(training_settings.get("max_length", 256))
     learning_rate = float(training_settings.get("learning_rate", 2e-5))
-    num_epochs = int(training_settings.get("num_epochs", 1))
+    num_epochs = int(training_settings.get("cross_encoder_num_epochs", training_settings.get("num_epochs", 1)))
     train_batch_size = int(training_settings.get("train_batch_size", 16))
     eval_batch_size = int(training_settings.get("eval_batch_size", 16))
     warmup_ratio = float(training_settings.get("warmup_ratio", 0.1))
@@ -213,49 +215,19 @@ def train_cross_encoder_with_overrides(
     seed = int(training_settings.get("seed", 42))
     device = "cpu" if force_cpu else None
 
-    labels = [row["label"] for row in rows]
-    stratify = labels if len(set(labels)) > 1 else None
-    train_rows, eval_rows = train_test_split(rows, test_size=0.2, random_state=seed, stratify=stratify)
-
     model_kwargs = {"device": device} if device is not None else {}
     model = CrossEncoder(model_name, num_labels=1, max_length=max_length, **model_kwargs)
-    evaluator = CrossEncoderClassificationEvaluator(
-        sentence_pairs=[(row["sentence1"], row["sentence2"]) for row in eval_rows],
-        labels=[float(row["label"]) for row in eval_rows],
-        name="compliance-eval",
-    )
     train_dataloader = DataLoader(
-        [InputExample(texts=[row["sentence1"], row["sentence2"]], label=float(row["label"])) for row in train_rows],
-        shuffle=True,
-        batch_size=train_batch_size,
-    )
-    warmup_steps = max(1, int(len(train_dataloader) * num_epochs * warmup_ratio))
-
-    model.old_fit(
-        train_dataloader=train_dataloader,
-        evaluator=evaluator,
-        epochs=num_epochs,
-        warmup_steps=warmup_steps,
-        optimizer_params={"lr": learning_rate},
-        weight_decay=0.01,
-        output_path=str(output_dir_monitor),
-        save_best_model=True,
-        show_progress_bar=True,
-    )
-    _cleanup_checkpoints(output_dir_monitor)
-
-    final_model = CrossEncoder(model_name, num_labels=1, max_length=max_length, **model_kwargs)
-    final_dataloader = DataLoader(
         [InputExample(texts=[row["sentence1"], row["sentence2"]], label=float(row["label"])) for row in rows],
         shuffle=True,
         batch_size=train_batch_size,
     )
-    final_warmup_steps = max(1, int(len(final_dataloader) * num_epochs * warmup_ratio))
-    final_model.old_fit(
-        train_dataloader=final_dataloader,
+    warmup_steps = max(1, int(len(train_dataloader) * num_epochs * warmup_ratio))
+    model.old_fit(
+        train_dataloader=train_dataloader,
         evaluator=None,
         epochs=num_epochs,
-        warmup_steps=final_warmup_steps,
+        warmup_steps=warmup_steps,
         optimizer_params={"lr": learning_rate},
         weight_decay=0.01,
         output_path=None,
@@ -263,7 +235,7 @@ def train_cross_encoder_with_overrides(
         show_progress_bar=True,
     )
     _cleanup_checkpoints(output_dir_final)
-    final_model.save(str(output_dir_final))
+    model.save(str(output_dir_final))
     return output_dir_final
 
 
