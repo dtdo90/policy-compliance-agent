@@ -352,6 +352,142 @@ APP_CSS = """
   padding: 10px;
 }
 
+.comparison-table-wrap {
+  overflow-x: auto;
+  margin: 0.55rem 0 0.4rem;
+  border-radius: 12px;
+  border: 1px solid #d7e1f2;
+  background: #ffffff;
+  box-shadow: 0 6px 18px rgba(15, 28, 64, 0.05);
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.comparison-table thead th {
+  background: #eef3fb;
+  color: #1f3864;
+  font-weight: 800;
+  text-align: left;
+  letter-spacing: 0.02em;
+  padding: 10px 14px;
+  border-bottom: 1px solid #d7e1f2;
+}
+
+.comparison-table tbody td {
+  padding: 10px 14px;
+  border-bottom: 1px solid #eef1f7;
+  vertical-align: middle;
+}
+
+.comparison-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.comparison-table details > summary {
+  cursor: pointer;
+  list-style: none;
+  font-weight: 800;
+  color: #1f3864;
+  padding: 2px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.comparison-table details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.comparison-table details > summary::before {
+  content: "\\25B8";
+  display: inline-block;
+  font-size: 0.75rem;
+  color: #2e75b6;
+  transition: transform 160ms ease;
+}
+
+.comparison-table details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.comparison-detail {
+  margin-top: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #f7faff;
+  border: 1px solid #e3ecf8;
+  display: grid;
+  gap: 6px;
+}
+
+.comparison-detail-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 10px;
+  font-size: 0.88rem;
+  color: #2a3754;
+}
+
+.comparison-detail-label {
+  font-weight: 700;
+  color: #2e75b6;
+  letter-spacing: 0.02em;
+}
+
+.comparison-detail-value code {
+  background: #eef3fb;
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.comparison-status {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.comparison-status.status-success {
+  background: #dff5e6;
+  color: #1d6c3c;
+}
+
+.comparison-status.status-improved {
+  background: #fff3d6;
+  color: #8a5a00;
+}
+
+.comparison-status.status-unchanged {
+  background: #ecf0f7;
+  color: #45526b;
+}
+
+.comparison-status.status-needs-review {
+  background: #fde2e1;
+  color: #b53d36;
+}
+
+.comparison-table .score-up code {
+  background: #dff5e6;
+  color: #1d6c3c;
+}
+
+.comparison-table .score-down code {
+  background: #fde2e1;
+  color: #b53d36;
+}
+
+.comparison-table .score-flat code {
+  background: #eef1f7;
+  color: #45526b;
+}
+
 #llm-review-results {
   line-height: 1.6;
 }
@@ -804,28 +940,160 @@ APP_CSS = """
   transform: none;
 }
 
-.agentic-upload-row {
+.btn-progress {
+  margin: 6px 0 4px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  min-height: 0 !important;
+}
+
+.btn-progress > * {
+  margin: 0 !important;
+}
+
+.btn-progress-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 999px;
+  background: #e6ecf6;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(15, 31, 58, 0.04);
+}
+
+.btn-progress-bar::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(10, 87, 168, 0) 0%,
+    rgba(10, 87, 168, 0.85) 30%,
+    rgba(0, 61, 122, 0.95) 50%,
+    rgba(10, 87, 168, 0.85) 70%,
+    rgba(10, 87, 168, 0) 100%
+  );
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  animation: btnProgressSlide 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.btn-progress-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    115deg,
+    rgba(255, 255, 255, 0.18) 0 8px,
+    rgba(255, 255, 255, 0) 8px 18px
+  );
+  animation: btnProgressStripes 1.6s linear infinite;
+  mix-blend-mode: overlay;
+  opacity: 0.65;
+}
+
+.btn-progress-bar--accent {
+  background: #f3eafc;
+}
+
+.btn-progress-bar--accent::before {
+  background: linear-gradient(
+    90deg,
+    rgba(91, 44, 134, 0) 0%,
+    rgba(91, 44, 134, 0.85) 30%,
+    rgba(45, 21, 70, 0.95) 50%,
+    rgba(91, 44, 134, 0.85) 70%,
+    rgba(91, 44, 134, 0) 100%
+  );
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+}
+
+.btn-progress-label {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1f2c46;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+@keyframes btnProgressSlide {
+  0%   { background-position: -45% 0; }
+  100% { background-position: 145% 0; }
+}
+
+@keyframes btnProgressStripes {
+  0%   { background-position: 0 0; }
+  100% { background-position: 36px 0; }
+}
+
+#agentic-upload-card {
   margin: 14px 0 12px;
+  padding: 14px 18px 16px !important;
+  border: 1px solid #d7e1f2 !important;
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  box-shadow: 0 8px 22px rgba(15, 28, 64, 0.05);
+  gap: 8px !important;
 }
 
-.agentic-upload-card {
-  padding: 16px !important;
-  border: 1px solid #e7dfd2 !important;
-  border-radius: 18px !important;
-  background: linear-gradient(180deg, #fffefd 0%, #fbf7f0 100%) !important;
-  box-shadow: 0 12px 28px rgba(79, 55, 26, 0.07);
+#agentic-upload-card .agentic-upload-title {
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #2e75b6;
+  margin: 0 0 4px;
 }
 
-.agentic-upload-card > .form,
-.agentic-upload-card .form {
+#agentic-upload-card .agentic-upload-copy {
+  font-size: 0.92rem;
+  color: #4b556b;
+  margin: 0 0 6px;
+}
+
+#agentic-upload-card .agentic-upload-copy code {
+  background: #eef3fb;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.85rem;
+  color: #1f3864;
+}
+
+#agentic-upload-tabs .tab-nav {
+  border-bottom: 1px solid #e6ecf6 !important;
+  padding: 0 !important;
+  margin: 0 0 8px !important;
+  gap: 4px !important;
+}
+
+#agentic-upload-tabs .tab-nav button {
+  background: transparent !important;
+  border: 0 !important;
+  padding: 6px 14px !important;
+  font-size: 0.86rem !important;
+  font-weight: 700 !important;
+  color: #6b7280 !important;
+}
+
+#agentic-upload-tabs .tab-nav button.selected {
+  color: #1f3864 !important;
+  border-bottom: 2px solid #2e75b6 !important;
+}
+
+#agentic-upload-card .form,
+#agentic-upload-card > .form,
+#agentic-upload-tabs .form {
   border: 0 !important;
   background: transparent !important;
   padding: 0 !important;
 }
 
-.agentic-upload-card input,
-.agentic-upload-card button {
-  min-height: 52px;
+#agentic-upload-tabs .file-preview,
+#agentic-upload-tabs [data-testid="file"] {
+  min-height: 0 !important;
 }
 
 #agentic-progress {
@@ -1125,6 +1393,14 @@ DEFAULT_AGENTIC_CHAT_MESSAGE = (
     "Ask about the latest agentic run."
 )
 
+
+def _btn_progress_html(label: str, *, accent: bool = False) -> str:
+    bar_class = "btn-progress-bar btn-progress-bar--accent" if accent else "btn-progress-bar"
+    return (
+        f"<div class='{bar_class}'></div>"
+        f"<div class='btn-progress-label'>{html.escape(label)}</div>"
+    )
+
 DEMO_RULE_DISPLAY_NAMES = {
     "101": "Identity verification",
     "102": "Change of Booking",
@@ -1180,7 +1456,7 @@ def _hero_html() -> str:
         "<div class='app-hero-brand'>"
         f"{logo_html}"
         "<div class='app-hero-brand-meta'>"
-        "<div class='app-hero-eyebrow'>UOB AI Labs</div>"
+        "<div class='app-hero-eyebrow'>INNOVATION &amp; RESEARCH</div>"
         "<div class='app-hero-team'>Policy Compliance</div>"
         "<div class='app-hero-tagline'>Agentic AI Demo</div>"
         "</div>"
@@ -1200,7 +1476,7 @@ def _hero_html() -> str:
         "<div class='app-hero-meta-card'>"
         "<div class='app-hero-meta-label'>Prepared by</div>"
         "<div class='app-hero-meta-value'>Tai Do</div>"
-        "<div class='app-hero-meta-note'>UOB AI Labs &middot; PBVA</div>"
+        "<div class='app-hero-meta-note'>INNOVATION &amp; RESEARCH &middot; PBVA</div>"
         "</div>"
         "</div>"
         "</div>"
@@ -1518,7 +1794,18 @@ def _format_agentic_comparison_markdown(comparisons: list[dict[str, Any]] | None
     if not comparisons:
         return "### Before/After Score Comparison\nNo comparison available yet."
 
-    lines = ["### Before/After Score Comparison"]
+    rows = [
+        "### Before/After Score Comparison\n",
+        "<div class='comparison-table-wrap'>",
+        "<table class='comparison-table'>",
+        "<thead><tr>"
+        "<th>Reviewed rule</th>"
+        "<th>Status</th>"
+        "<th>Score before</th>"
+        "<th>Score after</th>"
+        "</tr></thead>",
+        "<tbody>",
+    ]
     for index, item in enumerate(comparisons, start=1):
         rule_id = str(item.get("disclaimer_id", "")).strip() or "unknown"
         human_label = _label_to_display(item.get("final_label")) or "Unknown"
@@ -1532,25 +1819,53 @@ def _format_agentic_comparison_markdown(comparisons: list[dict[str, Any]] | None
 
         if human_label in {"Pass", "Fail"} and after_model == human_label:
             status = "Success"
+            status_class = "status-success"
         elif outcome == "improved":
             status = "Improved, but still needs review"
+            status_class = "status-improved"
         elif outcome == "unchanged":
             status = "Unchanged"
+            status_class = "status-unchanged"
         else:
             status = "Needs review"
+            status_class = "status-needs-review"
 
-        lines.extend(
-            [
-                "",
-                f"#### Case {index}: Rule {html.escape(rule_id)}",
-                f"- **Status:** `{html.escape(status)}`",
-                f"- **Anchor:** {html.escape(anchor)}",
-                f"- **Text:** {html.escape(phrase)}",
-                f"- **Label change:** model `{before_model}` -> human `{html.escape(human_label)}` -> model `{after_model}` after retrain",
-                f"- **Score:** `{before_score:.4f}` -> `{after_score:.4f}`",
-            ]
+        score_delta = after_score - before_score
+        if score_delta > 0.0005:
+            score_after_class = "score-up"
+        elif score_delta < -0.0005:
+            score_after_class = "score-down"
+        else:
+            score_after_class = "score-flat"
+
+        details_html = (
+            "<div class='comparison-detail'>"
+            f"<div class='comparison-detail-row'><span class='comparison-detail-label'>Anchor</span>"
+            f"<span class='comparison-detail-value'>{html.escape(anchor)}</span></div>"
+            f"<div class='comparison-detail-row'><span class='comparison-detail-label'>Phrase</span>"
+            f"<span class='comparison-detail-value'>{html.escape(phrase)}</span></div>"
+            f"<div class='comparison-detail-row'><span class='comparison-detail-label'>Label change</span>"
+            f"<span class='comparison-detail-value'>"
+            f"model <code>{html.escape(before_model)}</code> &rarr; "
+            f"human <code>{html.escape(human_label)}</code> &rarr; "
+            f"model <code>{html.escape(after_model)}</code> after retrain"
+            f"</span></div>"
+            "</div>"
         )
-    return "\n".join(lines)
+
+        summary_text = f"Case {index}: Rule {html.escape(rule_id)}"
+        rows.append(
+            "<tr>"
+            "<td>"
+            f"<details><summary>{summary_text}</summary>{details_html}</details>"
+            "</td>"
+            f"<td><span class='comparison-status {status_class}'>{html.escape(status)}</span></td>"
+            f"<td><code>{before_score:.4f}</code></td>"
+            f"<td class='{score_after_class}'><code>{after_score:.4f}</code></td>"
+            "</tr>"
+        )
+    rows.extend(["</tbody></table></div>"])
+    return "".join(rows)
 
 def _row_checked(value: Any) -> bool:
     if isinstance(value, bool):
@@ -1847,7 +2162,13 @@ def _format_app_agentic_summary(summary: dict[str, Any]) -> str:
         f"**Status** &nbsp; {_status_pill_html(status_raw)}",
     ]
     if message:
-        lines.extend(["", f"> **Agent message.** {message}"])
+        msg_lines = [ml.strip() for ml in message.splitlines() if ml.strip()]
+        if len(msg_lines) > 1:
+            lines.extend(["", "> **Agent message**", ">"])
+            for ml in msg_lines:
+                lines.append(f"> - {ml}")
+        else:
+            lines.extend(["", f"> **Agent message.** {message}"])
 
     stat_bullets: list[str] = []
     if "transcript_count" in summary:
@@ -1899,7 +2220,10 @@ def _format_app_agentic_summary(summary: dict[str, Any]) -> str:
 
     recommendation = str(summary.get("recommendation", "")).strip()
     if recommendation:
-        lines.extend(["", "### Recommendation", f"> {recommendation}"])
+        lines.extend(["", "### Recommendation"])
+        for rec_line in recommendation.splitlines():
+            stripped = rec_line.strip()
+            lines.append(">" if not stripped else f"> {stripped}")
 
     return "\n".join(lines)
 
@@ -2013,7 +2337,7 @@ def _format_supervisor_summary_table(summary: dict[str, Any]) -> str:
     rows = [
         "<div class='supervisor-table-wrap'>",
         "<table class='supervisor-table'>",
-        "<thead><tr><th>Transcript</th><th>Rule 101</th><th>Rule 102</th><th>PASS</th></tr></thead>",
+        "<thead><tr><th>Transcript</th><th>Rule 101</th><th>Rule 102</th><th>PASS</th><th>FAIL</th></tr></thead>",
         "<tbody>",
     ]
     for index, payload in enumerate(payloads, start=1):
@@ -2022,6 +2346,8 @@ def _format_supervisor_summary_table(summary: dict[str, Any]) -> str:
         score_102, status_102 = _payload_rule_score_and_status(payload, "102")
         compliant_rules = [rule for rule, status in (("101", status_101), ("102", status_102)) if status == "PASS"]
         compliant_text = ", ".join(compliant_rules) if compliant_rules else "None"
+        failed_rules = [rule for rule, status in (("101", status_101), ("102", status_102)) if status == "FAIL"]
+        failed_text = ", ".join(failed_rules) if failed_rules else "None"
         details = _format_payload_detail_html(payload)
         rows.append(
             "<tr>"
@@ -2031,6 +2357,7 @@ def _format_supervisor_summary_table(summary: dict[str, Any]) -> str:
             f"<td>{_format_score_cell(score_101, status_101)}</td>"
             f"<td>{_format_score_cell(score_102, status_102)}</td>"
             f"<td>{html.escape(compliant_text)}</td>"
+            f"<td>{html.escape(failed_text)}</td>"
             "</tr>"
         )
     rows.extend(["</tbody></table></div>"])
@@ -2666,9 +2993,17 @@ def build_demo_app(config_path: str | None = None):
             )
             return
 
+        review_running = {
+            "status": "running",
+            "message": (
+                "**InferenceAgent**: score every phrase in the uploaded transcript(s) "
+                "against Rule 101 and Rule 102.\n"
+                "**ReviewAgent**: review Borderline and Pass phrases."
+            ),
+        }
         yield (
             _format_agentic_progress(active="review"),
-            "## Agentic Loop\n- Status: `running`\n- Message: InferenceAgent is processing transcript(s), then Qwen will classify borderline and model-pass phrases.",
+            _format_app_agentic_summary(review_running),
             _agentic_review_dataframe([]),
             _format_agentic_comparison_markdown([]),
             "{}",
@@ -2728,7 +3063,12 @@ def build_demo_app(config_path: str | None = None):
         running = {
             **summary_payload,
             "status": "running",
-            "message": "TrainerAgent is saving approved rows, retraining from base models, then rerunning inference with the candidate model.",
+            "message": (
+                "**TrainerAgent** saves the approved rows into the dataset and retrains "
+                "the retriever and verifier from their base checkpoints.\n"
+                "A candidate model is then prepared so the same transcript(s) can be "
+                "re-scored for an apples-to-apples comparison."
+            ),
         }
         yield (
             _format_agentic_progress(active="retrain", completed={"review", "approval"}),
@@ -2740,6 +3080,7 @@ def build_demo_app(config_path: str | None = None):
             [],
             "",
             "",
+            gr.update(value=_btn_progress_html("TrainerAgent is retraining..."), visible=True),
         )
 
         try:
@@ -2762,13 +3103,19 @@ def build_demo_app(config_path: str | None = None):
                 [],
                 "",
                 "",
+                gr.update(visible=False),
             )
             return
 
         reinference_running = {
             **retrain_state,
             "status": "running",
-            "message": "InferenceAgent is rerunning the uploaded transcript(s) with the newly trained candidate model.",
+            "message": (
+                "**InferenceAgent** reruns the uploaded transcript(s) with the newly "
+                "trained candidate model.\n"
+                "New scores are then compared against the previous ones to highlight "
+                "any improvements or regressions."
+            ),
         }
         yield (
             _format_agentic_progress(active="reinference", completed={"review", "approval", "retrain"}),
@@ -2780,6 +3127,7 @@ def build_demo_app(config_path: str | None = None):
             [],
             "",
             "",
+            gr.update(value=_btn_progress_html("InferenceAgent is re-scoring..."), visible=True),
         )
         time.sleep(AGENTIC_REINFERENCE_PROGRESS_DWELL_SEC)
 
@@ -2808,6 +3156,7 @@ def build_demo_app(config_path: str | None = None):
             [],
             "",
             "",
+            gr.update(visible=False),
         )
 
     def agentic_chat_ui(
@@ -2894,13 +3243,36 @@ def build_demo_app(config_path: str | None = None):
     def investigate_review_cases_ui(
         dataframe: pd.DataFrame,
         summary_payload: dict[str, Any],
-    ) -> tuple[str, pd.DataFrame, dict[str, Any], str]:
+    ):
         summary_payload = summary_payload if isinstance(summary_payload, dict) else {}
         review_items = summary_payload.get("review_items", [])
         current_items = [dict(item) for item in review_items if isinstance(item, dict)] if isinstance(review_items, list) else []
         merged_items = _merge_review_items(dataframe, current_items)
         if not merged_items:
             merged_items = current_items
+
+        running_md = (
+            "### InvestigatorAgent Diagnosis\n"
+            "> **InvestigatorAgent** is investigating the failed cases.\n"
+            ">\n"
+            "> - Looks across the synthetic dataset for coverage gaps that explain "
+            "the model / human disagreements.\n"
+            "> - Recommends the next action for improving the dataset before retraining."
+        )
+        yield (
+            running_md,
+            gr.update(),
+            gr.update(),
+            gr.update(),
+            gr.update(
+                value=_btn_progress_html(
+                    "InvestigatorAgent is diagnosing...",
+                    accent=True,
+                ),
+                visible=True,
+            ),
+        )
+
         report = investigate_label_changed_cases_with_ollama(merged_items, config=config)
         generated_items = report.get("generated_training_items", []) if isinstance(report, dict) else []
         generated_items = [dict(item) for item in generated_items if isinstance(item, dict)]
@@ -2911,11 +3283,12 @@ def build_demo_app(config_path: str | None = None):
             "diagnosis": report,
             "review_items": updated_review_items,
         }
-        return (
+        yield (
             _format_review_case_investigation_report(report),
             _agentic_review_table_update(updated_review_items),
             updated_summary,
             json.dumps(updated_summary, indent=2, ensure_ascii=False),
+            gr.update(visible=False),
         )
 
     def investigate_regressions_ui(summary_payload: dict[str, Any]) -> tuple[str, dict[str, Any], str]:
@@ -3110,31 +3483,26 @@ def build_demo_app(config_path: str | None = None):
                     "Re-train and re-inference.**",
                     elem_id="agentic-tab-intro",
                 )
-                with gr.Row(equal_height=True, elem_classes=["agentic-upload-row"]):
-                    with gr.Column(scale=1, elem_classes=["agentic-upload-card"]):
-                        gr.HTML(
-                            "<div class='source-kicker'>Option 1</div>"
-                            "<div class='source-title'>Upload file(s)</div>"
-                            "<div class='source-copy'>Choose one <code>.txt</code>/<code>.json</code> file or several <code>.txt</code> transcripts.</div>"
-                        )
-                        incoming_upload = gr.File(
-                            label="Transcript file(s)",
-                            file_count="multiple",
-                            file_types=[".txt", ".json"],
-                            height=110,
-                        )
-                    with gr.Column(scale=1, elem_classes=["agentic-upload-card"]):
-                        gr.HTML(
-                            "<div class='source-kicker'>Option 2</div>"
-                            "<div class='source-title'>Upload folder</div>"
-                            "<div class='source-copy'>Choose a local folder. The loop will use every <code>.txt</code> transcript inside it.</div>"
-                        )
-                        incoming_folder_upload = gr.File(
-                            label="Folder of .txt transcripts",
-                            file_count="directory",
-                            file_types=[".txt"],
-                            height=110,
-                        )
+                with gr.Column(elem_id="agentic-upload-card"):
+                    gr.HTML(
+                        "<div class='agentic-upload-title'>Upload transcripts</div>"
+                        "<div class='agentic-upload-copy'>One or more <code>.txt</code> / <code>.json</code> transcripts, or a folder of <code>.txt</code> files.</div>"
+                    )
+                    with gr.Tabs(elem_id="agentic-upload-tabs"):
+                        with gr.Tab("Files"):
+                            incoming_upload = gr.File(
+                                label="Transcript file(s)",
+                                file_count="multiple",
+                                file_types=[".txt", ".json"],
+                                height=120,
+                            )
+                        with gr.Tab("Folder"):
+                            incoming_folder_upload = gr.File(
+                                label="Folder of .txt transcripts",
+                                file_count="directory",
+                                file_types=[".txt"],
+                                height=120,
+                            )
                 with gr.Row():
                     agentic_reset_base_btn = gr.Button(
                         "Reset to Base Models",
@@ -3191,6 +3559,12 @@ def build_demo_app(config_path: str | None = None):
                     )
                     agentic_investigate_review_btn = gr.Button("Investigate Failed Cases", variant="secondary", elem_id="agentic-investigate-review-btn")
                     agentic_investigate_btn = gr.Button("Investigate Score Regressions", variant="secondary", elem_id="agentic-investigate-regression-btn")
+                agentic_investigate_review_progress = gr.HTML(
+                    value=_btn_progress_html("InvestigatorAgent is working...", accent=True),
+                    visible=False,
+                    elem_id="agentic-investigate-review-progress",
+                    elem_classes=["btn-progress"],
+                )
                 with gr.Row():
                     agentic_continue_btn = gr.Button(
                         "Approve, Retrain, Compare",
@@ -3198,6 +3572,12 @@ def build_demo_app(config_path: str | None = None):
                         variant="secondary",
                         elem_id="agentic-continue-btn",
                     )
+                agentic_continue_progress = gr.HTML(
+                    value=_btn_progress_html("TrainerAgent is working..."),
+                    visible=False,
+                    elem_id="agentic-continue-progress",
+                    elem_classes=["btn-progress"],
+                )
                 agentic_investigation_markdown = gr.Markdown(
                     "### InvestigatorAgent Diagnosis\n"
                     "Click **Investigate Failed Cases** to inspect synthetic coverage "
@@ -3283,6 +3663,7 @@ def build_demo_app(config_path: str | None = None):
                         agentic_chatbot,
                         agentic_chat_input,
                         agentic_investigation_markdown,
+                        agentic_continue_progress,
                     ],
                 )
 
@@ -3303,6 +3684,7 @@ def build_demo_app(config_path: str | None = None):
                         agentic_review_table,
                         agentic_summary_state,
                         agentic_raw_output,
+                        agentic_investigate_review_progress,
                     ],
                 )
                 agentic_investigate_btn.click(

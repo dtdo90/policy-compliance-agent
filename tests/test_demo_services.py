@@ -194,7 +194,8 @@ def test_agentic_review_summary_lists_rules_before_borderline(monkeypatch):
     assert "Rule 101: FAIL" in summary
     assert "Rule 102: FAIL" in summary
     assert "SupervisorAgent prepared" not in summary
-    assert "SupervisorAgent prepared 1 phrase" in result["recommendation"]
+    assert "SupervisorAgent** prepared 1 phrase" in result["recommendation"]
+    assert "**Human approval** is required before retraining." in result["recommendation"]
     assert "Review item 1" not in summary
     assert "Review the labels" not in summary
     assert "Anchor 1:" not in summary

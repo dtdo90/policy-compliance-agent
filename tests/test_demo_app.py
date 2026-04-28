@@ -253,9 +253,15 @@ def test_format_agentic_comparison_markdown_shows_case_outcomes():
     )
 
     assert "Case 1: Rule 101" in text
-    assert "Status:** `Success`" in text
-    assert "model `Pass` -> human `Fail` -> model `Fail` after retrain" in text
-    assert "`0.9986` -> `0.4817`" in text
+    assert "comparison-table" in text
+    assert "<th>Reviewed rule</th>" in text
+    assert "status-success" in text
+    assert ">Success<" in text
+    assert "0.9986" in text
+    assert "0.4817" in text
+    assert "score-down" in text
+    assert "model <code>Pass</code>" in text
+    assert "human <code>Fail</code>" in text
     assert "| Rule |" not in text
 
 
@@ -403,11 +409,12 @@ def test_format_app_agentic_summary_renders_supervisor_table_with_collapsible_de
     )
 
     assert "<table class='supervisor-table'>" in text
-    assert "<th>Transcript</th><th>Rule 101</th><th>Rule 102</th><th>PASS</th>" in text
+    assert "<th>Transcript</th><th>Rule 101</th><th>Rule 102</th><th>PASS</th><th>FAIL</th>" in text
     assert "<summary>Transcript 1: sample_helpdesk_bad</summary>" in text
     assert "<td><code>0.102</code>" in text
     assert "<td><code>0.901</code>" in text
     assert "<td>102</td>" in text
+    assert "<td>101</td>" in text
     assert "Show transcript text" in text
 
 

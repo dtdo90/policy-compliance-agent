@@ -36,7 +36,7 @@ MAX_CHAT_CONTEXT_TEXT_CHARS = 240
 MAX_CHAT_REVIEW_ITEMS = 5
 CHAT_NUM_PREDICT = 768
 LABEL_NUM_PREDICT = 128
-INVESTIGATOR_NUM_PREDICT = 384
+INVESTIGATOR_NUM_PREDICT = 256
 
 
 @dataclass
@@ -2457,14 +2457,14 @@ def run_agentic_review_cycle(
         return result
 
     prepared_message = (
-        f"SupervisorAgent prepared {len(labeled_items)} phrase(s) for human review: "
+        f"**SupervisorAgent** prepared {len(labeled_items)} phrase(s) for human review: "
         f"{display_borderline_count} borderline phrase(s) and "
         f"{pass_qwen_fail_count} model-pass/Qwen-fail phrase(s)."
     )
     recommendation_lines = [
-        "Human approval is required before retraining.",
+        "**Human approval** is required before retraining.",
         "",
-        f"**{prepared_message}**",
+        prepared_message,
     ]
     summary_lines = [*_summarize_rule_evidence(before_payloads)]
     result = {
